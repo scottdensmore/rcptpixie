@@ -21,12 +21,13 @@ jobs:
         run: go mod download
 
       - name: Install Ollama
-        run: |
-          curl -fsSL https://ollama.com/install.sh | sh
-          ollama pull llama2
-          # Start Ollama in the background
-          ollama serve &
+        run: curl -fsSL https://ollama.com/install.sh | sh
       
+      - name: Run ollama
+        run: |
+          ollama serve &
+          ollama pull llama2
+    
       - name: Wait for Ollama to start
         run: |
           for i in {1..30}; do
