@@ -24,6 +24,21 @@ jobs:
         run: |
           curl -fsSL https://ollama.com/install.sh | sh
           ollama pull llama2
+          # Start Ollama in the background
+          ollama serve &
+          # Wait for Ollama to be ready
+          for i in {1..30}; do
+            if curl -s http://localhost:11434/api/tags > /dev/null; then
+              echo "Ollama is ready!"
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "Ollama failed to start within 30 seconds"
+              exit 1
+            fi
+            echo "Waiting for Ollama to start... ($i/30)"
+            sleep 1
+          done
 
       - name: Run tests
         run: go test -v ./...
