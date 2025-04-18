@@ -9,6 +9,7 @@ A command-line tool that automatically renames PDF receipts using AI-powered tex
 - Automatically renames files with consistent formatting
 - Supports both single files and directories
 - Cross-platform support (Windows, macOS, Linux)
+- Version information tracking
 
 ## Installation
 
@@ -56,6 +57,9 @@ rcptpixie /path/to/receipts/
 
 # Specify a different Ollama model
 rcptpixie -model llama3.2 /path/to/receipt.pdf
+
+# Show version information
+rcptpixie -version
 ```
 
 ## File Naming Format

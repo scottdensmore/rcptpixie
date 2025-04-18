@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/dslipak/pdf"
+	"github.com/scottdensmore/rcptpixie/version"
 )
 
 type ReceiptInfo struct {
@@ -38,7 +39,14 @@ type OllamaResponse struct {
 func main() {
 	// Parse command line flags
 	modelName := flag.String("model", "llama3.2", "Ollama model to use")
+	showVersion := flag.Bool("version", false, "Show version information")
 	flag.Parse()
+
+	// Show version if requested
+	if *showVersion {
+		fmt.Println(version.Get())
+		return
+	}
 
 	// Get input path from command line arguments
 	args := flag.Args()

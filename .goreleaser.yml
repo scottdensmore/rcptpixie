@@ -18,6 +18,11 @@ builds:
       - goos: darwin
         goarch: arm64
         goarm: 7
+    ldflags:
+      - -s -w
+      - -X github.com/scottdensmore/rcptpixie/version.Version={{.Version}}
+      - -X github.com/scottdensmore/rcptpixie/version.Commit={{.Commit}}
+      - -X github.com/scottdensmore/rcptpixie/version.BuildDate={{.Date}}
 
 archives:
   - format: tar.gz
