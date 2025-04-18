@@ -8,9 +8,9 @@ import (
 var (
 	// Version is the current version of the application
 	Version = "dev"
-	// Commit is the git commit hash
+	// Commit is the git commit hash (set at build time)
 	Commit = "unknown"
-	// BuildDate is the date the binary was built
+	// BuildDate is the date the binary was built (set at build time)
 	BuildDate = "unknown"
 )
 
