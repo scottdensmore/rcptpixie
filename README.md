@@ -13,14 +13,27 @@ A command-line tool that automatically renames PDF receipts using AI-powered tex
 - Supports both single files and directories
 - Cross-platform support (Windows, macOS, Linux)
 - Version information tracking
+- Handles both regular and hotel receipts
+- Supports numbers with commas in totals (e.g., $1,234.56)
 
 ## Prerequisites
 
 - Go 1.21 or later
 - [Ollama](https://ollama.ai/) installed and running
-- The llama2 model installed in Ollama
+- The llama3.2 model installed in Ollama (default) or any other compatible model
 
 ## Installation
+
+### From Source
+
+```bash
+# Clone the repository
+git clone https://github.com/scottdensmore/rcptpixie.git
+cd rcptpixie
+
+# Build and install
+go install ./cmd/rcptpixie
+```
 
 ### From GitHub Releases
 
@@ -65,7 +78,7 @@ rcptpixie /path/to/receipt.pdf
 rcptpixie /path/to/receipts/
 
 # Specify a different Ollama model
-rcptpixie -model llama2:latest /path/to/receipt.pdf
+rcptpixie -model llama3.2 /path/to/receipt.pdf
 
 # Show version information
 rcptpixie -version
@@ -77,7 +90,7 @@ rcptpixie -verbose /path/to/receipt.pdf
 ### Command Line Options
 
 - `-help`: Show help information
-- `-model`: Specify the Ollama model to use (default: "llama2:latest")
+- `-model`: Specify the Ollama model to use (default: "llama3.2")
 - `-version`: Show version information
 - `-verbose`: Enable detailed logging for debugging (shows processing steps, PDF extraction details, and LLM interactions)
 
@@ -87,43 +100,81 @@ Receipts are renamed using the following format:
 - Regular receipts: `MM-DD-YYYY - AMOUNT - VENDOR - CATEGORY.pdf`
 - Hotel receipts: `MM-DD-YYYY to MM-DD-YYYY - AMOUNT - VENDOR - CATEGORY.pdf`
 
+Examples:
+- `01-15-2023 - 123.45 - Test_Store - Food.pdf`
+- `01-15-2023 to 01-17-2023 - 500.00 - Grand_Hotel - Lodging.pdf`
+- `01-15-2023 - 17830.81 - Test_Store - Food_&_Drink.pdf`
+
+## Project Structure
+
+```
+rcptpixie/
+├── cmd/
+│   └── rcptpixie/          # Command-line interface
+│       ├── main.go
+│       └── main_test.go
+├── internal/
+│   └── rcptpixie/          # Core functionality
+│       ├── rcptpixie.go
+│       ├── main_test.go
+│       └── main_integration_test.go
+├── scripts/                # Utility scripts
+├── testdata/              # Test files
+├── version/               # Version information
+├── go.mod
+└── go.sum
+```
+
 ## Development
 
 ### Running Tests
 
 #### Unit Tests
 ```bash
-go test -v
+go test ./... -v
 ```
 
 #### Integration Tests
-The integration tests require Ollama to be running and the llama2 model to be installed. To run the integration tests:
+The integration tests require Ollama to be running and the llama3.2 model to be installed. To run the integration tests:
 
 1. Make sure Ollama is running:
    ```bash
    ollama serve
    ```
 
-2. Install the llama2 model if not already installed:
+2. Install the llama3.2 model if not already installed:
    ```bash
-   ollama pull llama2
+   ollama pull llama3.2
    ```
 
 3. Run the integration tests:
    ```bash
-   go test -v -run TestPDFProcessing
+   go test -v ./... -run TestPDFProcessing
    ```
 
 To skip integration tests (e.g., in CI environments), set the `SKIP_INTEGRATION_TESTS` environment variable:
 ```bash
-SKIP_INTEGRATION_TESTS=1 go test -v
+SKIP_INTEGRATION_TESTS=1 go test ./... -v
 ```
 
 ### Building
 
 ```bash
-go build
+# Build the binary
+go build -o rcptpixie ./cmd/rcptpixie
+
+# Install to $GOPATH/bin
+go install ./cmd/rcptpixie
 ```
+
+### Error Handling
+
+The tool provides clear error messages for common issues:
+- Missing or invalid PDF files
+- Ollama connection issues
+- Missing or unavailable models
+- Invalid receipt formats
+- Insufficient receipt information
 
 ## License
 
