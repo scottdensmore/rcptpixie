@@ -1,0 +1,16 @@
+name: Trigger Formula Update
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger formula update
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: scottdensmore/homebrew-tap
+          event-type: update-formula 
