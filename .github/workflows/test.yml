@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
+      
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
@@ -26,7 +26,9 @@ jobs:
           ollama pull llama2
           # Start Ollama in the background
           ollama serve &
-          # Wait for Ollama to be ready
+      
+      - name: Wait for Ollama to start
+        run: |
           for i in {1..30}; do
             if curl -s http://localhost:11434/api/tags > /dev/null; then
               echo "Ollama is ready!"
@@ -34,6 +36,7 @@ jobs:
             fi
             if [ $i -eq 30 ]; then
               echo "Ollama failed to start within 30 seconds"
+              journalctl -u ollama.service # Log output for debugging
               exit 1
             fi
             echo "Waiting for Ollama to start... ($i/30)"
@@ -43,4 +46,4 @@ jobs:
       - name: Run tests
         run: go test -v ./...
         env:
-          SKIP_INTEGRATION_TESTS: "false" 
+          SKIP_INTEGRATION_TESTS: "false"
