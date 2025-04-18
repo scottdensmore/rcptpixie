@@ -39,11 +39,26 @@ type OllamaResponse struct {
 	Response string `json:"response"`
 }
 
+// Logger is a custom logger that only prints when verbose mode is enabled
+type Logger struct {
+	verbose bool
+}
+
+func (l *Logger) Printf(format string, v ...interface{}) {
+	if l.verbose {
+		log.Printf(format, v...)
+	}
+}
+
+var logger Logger
+
 func main() {
 	// Parse command line flags
 	modelName := flag.String("model", "llama3.2", "Ollama model to use")
 	showVersion := flag.Bool("version", false, "Show version information")
 	showHelp := flag.Bool("help", false, "Show help information")
+	verbose := flag.Bool("verbose", false, "Enable verbose logging")
+
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %s [options] <pdf-file-or-directory>\n\n", os.Args[0])
 		fmt.Fprintf(flag.CommandLine.Output(), "Options:\n")
@@ -51,8 +66,12 @@ func main() {
 		fmt.Fprintf(flag.CommandLine.Output(), "\nExamples:\n")
 		fmt.Fprintf(flag.CommandLine.Output(), "  %s receipt.pdf\n", os.Args[0])
 		fmt.Fprintf(flag.CommandLine.Output(), "  %s -model llama3.2 ./receipts/\n", os.Args[0])
+		fmt.Fprintf(flag.CommandLine.Output(), "  %s -verbose receipt.pdf\n", os.Args[0])
 	}
 	flag.Parse()
+
+	// Initialize logger
+	logger = Logger{verbose: *verbose}
 
 	// Show help if requested or no arguments provided
 	if *showHelp || (len(flag.Args()) == 0 && !*showVersion) {
@@ -70,6 +89,9 @@ func main() {
 	args := flag.Args()
 	inputPath := args[0]
 
+	logger.Printf("Starting processing with model: %s", *modelName)
+	logger.Printf("Processing input path: %s", inputPath)
+
 	// Check if the input is a directory
 	info, err := os.Stat(inputPath)
 	if err != nil {
@@ -77,12 +99,14 @@ func main() {
 	}
 
 	if info.IsDir() {
+		logger.Printf("Processing directory: %s", inputPath)
 		// Process all PDF files in the directory
 		err := filepath.Walk(inputPath, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
 			if !info.IsDir() && strings.HasSuffix(strings.ToLower(path), ".pdf") {
+				logger.Printf("Found PDF file: %s", path)
 				if err := processFile(path, *modelName); err != nil {
 					log.Printf("Error processing %s: %v", path, err)
 				}
@@ -93,6 +117,7 @@ func main() {
 			log.Fatalf("Error walking directory %s: %v", inputPath, err)
 		}
 	} else {
+		logger.Printf("Processing single file: %s", inputPath)
 		// Process single file
 		if err := processFile(inputPath, *modelName); err != nil {
 			log.Fatalf("Error processing %s: %v", inputPath, err)
@@ -101,6 +126,7 @@ func main() {
 }
 
 func extractTextFromPDF(filePath string) (string, error) {
+	logger.Printf("Extracting text from PDF: %s", filePath)
 	// Open the PDF file
 	r, err := pdf.Open(filePath)
 	if err != nil {
@@ -109,9 +135,14 @@ func extractTextFromPDF(filePath string) (string, error) {
 
 	var textBuilder strings.Builder
 	// Extract text from all pages
-	for i := 1; i <= r.NumPage(); i++ {
+	totalPages := r.NumPage()
+	logger.Printf("PDF has %d pages", totalPages)
+
+	for i := 1; i <= totalPages; i++ {
+		logger.Printf("Processing page %d of %d", i, totalPages)
 		p := r.Page(i)
 		if p.V.IsNull() {
+			logger.Printf("Page %d is null, skipping", i)
 			continue
 		}
 		text, err := p.GetPlainText(nil)
@@ -122,22 +153,28 @@ func extractTextFromPDF(filePath string) (string, error) {
 		textBuilder.WriteString("\n")
 	}
 
-	return textBuilder.String(), nil
+	extractedText := textBuilder.String()
+	logger.Printf("Successfully extracted %d characters of text", len(extractedText))
+	return extractedText, nil
 }
 
 func processFile(filePath string, modelName string) error {
+	logger.Printf("Starting to process file: %s", filePath)
+
 	// Verify file exists and is a PDF
 	if !strings.HasSuffix(strings.ToLower(filePath), ".pdf") {
 		return fmt.Errorf("file %s is not a PDF", filePath)
 	}
 
 	// Extract text from PDF
+	logger.Printf("Extracting text from PDF")
 	textContent, err := extractTextFromPDF(filePath)
 	if err != nil {
 		return fmt.Errorf("error extracting text from PDF: %v", err)
 	}
 
 	// Create prompt for the LLM
+	logger.Printf("Creating prompt for LLM")
 	prompt := fmt.Sprintf(`You are a helpful assistant that extracts information from receipts. Please analyze this existing receipt and extract the following information:
 
 Receipt Text:
@@ -160,6 +197,7 @@ Category: Food
 For hotel receipts, use Check-in Date and Check-out Date instead of Date.`, textContent)
 
 	// Create request to Ollama
+	logger.Printf("Creating request for Ollama model: %s", modelName)
 	reqBody := OllamaRequest{
 		Model:  modelName,
 		Prompt: prompt,
@@ -174,6 +212,7 @@ For hotel receipts, use Check-in Date and Check-out Date instead of Date.`, text
 	}
 
 	// Send request to Ollama
+	logger.Printf("Sending request to Ollama")
 	resp, err := http.Post("http://localhost:11434/api/generate", "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return fmt.Errorf("error connecting to Ollama: %v. Make sure Ollama is running and the model '%s' is available", err, modelName)
@@ -185,6 +224,8 @@ For hotel receipts, use Check-in Date and Check-out Date instead of Date.`, text
 		return fmt.Errorf("model '%s' not found. Please make sure the model is available in Ollama", modelName)
 	}
 
+	logger.Printf("Received response from Ollama with status: %d", resp.StatusCode)
+
 	// Read response
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -193,6 +234,7 @@ For hotel receipts, use Check-in Date and Check-out Date instead of Date.`, text
 
 	var ollamaResp OllamaResponse
 	if err := json.Unmarshal(body, &ollamaResp); err != nil {
+		logger.Printf("Attempting to parse streaming response")
 		// Try to parse the response as a streaming response
 		lines := strings.Split(string(body), "\n")
 		var fullResponse strings.Builder
@@ -215,6 +257,7 @@ For hotel receipts, use Check-in Date and Check-out Date instead of Date.`, text
 		ollamaResp.Response = fullResponse.String()
 	}
 
+	logger.Printf("Parsing Ollama response")
 	// Parse the response and create ReceiptInfo
 	info, err := parseCompletion(ollamaResp.Response)
 	if err != nil {
@@ -225,6 +268,9 @@ For hotel receipts, use Check-in Date and Check-out Date instead of Date.`, text
 	if info.Date.IsZero() && info.Total == 0 && info.Vendor == "" && info.Category == "" {
 		return fmt.Errorf("could not extract enough information from the receipt")
 	}
+
+	logger.Printf("Extracted Receipt Info: Date: %v, Total: %.2f, Vendor: %s, Category: %s",
+		info.Date, info.Total, info.Vendor, info.Category)
 
 	// Generate new filename
 	dir := filepath.Dir(filePath)
@@ -247,6 +293,8 @@ For hotel receipts, use Check-in Date and Check-out Date instead of Date.`, text
 		strings.ReplaceAll(info.Vendor, " ", "_"),
 		strings.ReplaceAll(info.Category, " ", "_"),
 		ext)
+
+	logger.Printf("Generated new filename: %s", newName)
 
 	// Rename the file
 	newPath := filepath.Join(dir, newName)
