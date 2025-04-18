@@ -119,7 +119,6 @@ rcptpixie/
 │       ├── main_test.go
 │       └── main_integration_test.go
 ├── scripts/                # Utility scripts
-├── testdata/              # Test files
 ├── version/               # Version information
 ├── go.mod
 └── go.sum

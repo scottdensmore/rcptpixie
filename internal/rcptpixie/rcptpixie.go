@@ -116,19 +116,34 @@ Receipt Text:
 
 Please extract and provide ONLY the following information in this exact format:
 Date: YYYY-MM-DD (for regular receipts)
-Check-in Date: YYYY-MM-DD (for hotel receipts)
-Check-out Date: YYYY-MM-DD (for hotel receipts)
-Total: XXXX.XX
+Start Date: YYYY-MM-DD (for hotel receipts)
+End Date: YYYY-MM-DD (for hotel receipts)
+Total: XXXX.XX (numeric value only, no currency symbols or text)
 Vendor: Name
-Category: Type
+Category: Type (choose the single most appropriate category)
 
-If any field cannot be determined from the receipt, leave it empty but keep the label. For example:
-Date: 
+Important instructions:
+1. Keep the original currency amount without conversion
+2. Do not include any currency symbols, codes, or text
+3. For hotel receipts, use Start Date and End Date instead of Date
+4. If any field cannot be determined from the receipt, leave it empty but keep the label
+5. For dates, always use YYYY-MM-DD format
+6. For totals, always use decimal point (.) and no currency symbols or text
+7. For category, choose ONE most appropriate category (do not list multiple categories)
+8. Do not include any additional text or notes in the output
+
+Example output for a regular receipt:
+Date: 2023-01-15
 Total: 123.45
-Vendor: Unknown Store
+Vendor: Test Store
 Category: Food
 
-For hotel receipts, use Check-in Date and Check-out Date instead of Date.`, textContent)
+Example output for a hotel receipt:
+Start Date: 2023-01-10
+End Date: 2023-01-15
+Total: 1234.56
+Vendor: Grand Hotel
+Category: Lodging`, textContent)
 
 	// Create request to Ollama
 	Log.Printf("Creating request for Ollama model: %s", modelName)
@@ -221,11 +236,16 @@ For hotel receipts, use Check-in Date and Check-out Date instead of Date.`, text
 		datePart = fmt.Sprintf("%s to %s", startDate, endDate)
 	}
 
+	// Replace spaces with underscores and handle commas in categories
+	vendorPart := strings.ReplaceAll(info.Vendor, " ", "_")
+	categoryPart := strings.ReplaceAll(info.Category, " ", "_")
+	categoryPart = strings.ReplaceAll(categoryPart, ",", ",_")
+
 	newName := fmt.Sprintf("%s - %.2f - %s - %s%s",
 		datePart,
 		info.Total,
-		strings.ReplaceAll(info.Vendor, " ", "_"),
-		strings.ReplaceAll(info.Category, " ", "_"),
+		vendorPart,
+		categoryPart,
 		ext)
 
 	Log.Printf("Generated new filename: %s", newName)
@@ -280,17 +300,6 @@ func ParseCompletion(completion string) (ReceiptInfo, error) {
 			}
 			info.EndDate = date
 		case "Total":
-			// Remove currency symbols, codes, and commas
-			value = strings.ReplaceAll(value, ",", "")
-			value = strings.TrimLeft(value, "$€£¥₹")
-			// Handle currency codes
-			fields := strings.Fields(value)
-			if len(fields) == 2 {
-				switch fields[0] {
-				case "EUR", "GBP", "JPY", "INR", "USD":
-					value = fields[1]
-				}
-			}
 			total, err := strconv.ParseFloat(value, 64)
 			if err != nil {
 				return ReceiptInfo{}, fmt.Errorf("invalid total amount: %v", err)
@@ -299,12 +308,7 @@ func ParseCompletion(completion string) (ReceiptInfo, error) {
 		case "Vendor":
 			info.Vendor = value
 		case "Category":
-			// Handle multiple categories
-			categories := strings.Split(value, ",")
-			for i, cat := range categories {
-				categories[i] = strings.TrimSpace(cat)
-			}
-			info.Category = strings.Join(categories, ", ")
+			info.Category = value
 		}
 	}
 
@@ -340,11 +344,16 @@ func GenerateFilename(info ReceiptInfo) string {
 		datePart = fmt.Sprintf("%s to %s", startDate, endDate)
 	}
 
+	// Replace spaces with underscores and handle commas in categories
+	vendorPart := strings.ReplaceAll(info.Vendor, " ", "_")
+	categoryPart := strings.ReplaceAll(info.Category, " ", "_")
+	categoryPart = strings.ReplaceAll(categoryPart, ",", ",_")
+
 	return fmt.Sprintf("%s - %.2f - %s - %s.pdf",
 		datePart,
 		info.Total,
-		strings.ReplaceAll(info.Vendor, " ", "_"),
-		strings.ReplaceAll(info.Category, " ", "_"))
+		vendorPart,
+		categoryPart)
 }
 
 // IsOllamaRunning checks if the Ollama service is running

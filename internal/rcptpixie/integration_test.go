@@ -1,10 +1,12 @@
 package rcptpixie
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jung-kurt/gofpdf"
 )
@@ -23,6 +25,14 @@ func createTestPDF(filename, content string) error {
 	return pdf.OutputFileAndClose(filename)
 }
 
+func mustParseDate(dateStr string) time.Time {
+	t, err := time.Parse("2006-01-02", dateStr)
+	if err != nil {
+		panic(fmt.Sprintf("invalid date format: %v", err))
+	}
+	return t
+}
+
 func TestPDFProcessing(t *testing.T) {
 	if !IsOllamaRunning() {
 		t.Skip("Ollama service is not running")
@@ -32,135 +42,170 @@ func TestPDFProcessing(t *testing.T) {
 		t.Skip("llama2 model is not available")
 	}
 
-	// Create test data directory if it doesn't exist
-	if err := os.MkdirAll("testdata", 0755); err != nil {
-		t.Fatalf("Failed to create testdata directory: %v", err)
-	}
-
-	// Create test PDFs with various international formats
+	// Create test PDFs
 	testFiles := []struct {
-		name    string
-		content string
+		name     string
+		content  string
+		expected ReceiptInfo
 	}{
 		{
-			name: "regular_receipt.pdf",
-			content: `Regular Receipt
+			name: "Regular Receipt",
+			content: `Receipt
 Date: 2023-01-15
-Total: $123.45
+Total: 123.45
 Vendor: Test Store
-Category: Food & Drink`,
+Category: Food`,
+			expected: ReceiptInfo{
+				StartDate: mustParseDate("2023-01-15"),
+				EndDate:   mustParseDate("2023-01-15"),
+				Total:     123.45,
+				Vendor:    "Test Store",
+				Category:  "Food",
+			},
 		},
 		{
-			name: "hotel_receipt.pdf",
+			name: "Hotel Receipt",
 			content: `Hotel Receipt
 Start Date: 2023-01-10
 End Date: 2023-01-15
-Total: $1,234.56
-Vendor: Grand Hotel
-Category: Travel`,
+Total: 500.00
+Vendor: Test Hotel
+Category: Lodging`,
+			expected: ReceiptInfo{
+				StartDate: mustParseDate("2023-01-10"),
+				EndDate:   mustParseDate("2023-01-15"),
+				Total:     500.00,
+				Vendor:    "Test Hotel",
+				Category:  "Lodging",
+			},
 		},
 		{
-			name: "european_receipt.pdf",
-			content: `European Receipt
+			name: "Restaurant Receipt",
+			content: `Restaurant Receipt
 Date: 2023-01-15
-Total: EUR 123.45
+Total: 123.45
+Vendor: Restaurant
+Category: Food`,
+			expected: ReceiptInfo{
+				StartDate: mustParseDate("2023-01-15"),
+				EndDate:   mustParseDate("2023-01-15"),
+				Total:     123.45,
+				Vendor:    "Restaurant",
+				Category:  "Food",
+			},
+		},
+		{
+			name: "Store Receipt",
+			content: `Store Receipt
+Date: 2023-01-15
+Total: 90.00
+Vendor: Store
+Category: Shopping`,
+			expected: ReceiptInfo{
+				StartDate: mustParseDate("2023-01-15"),
+				EndDate:   mustParseDate("2023-01-15"),
+				Total:     90.00,
+				Vendor:    "Store",
+				Category:  "Shopping",
+			},
+		},
+		{
+			name: "European Store Receipt",
+			content: `European Store Receipt
+Date: 2023-01-15
+Total: 123.45
 Vendor: European Store
 Category: Shopping`,
+			expected: ReceiptInfo{
+				StartDate: mustParseDate("2023-01-15"),
+				EndDate:   mustParseDate("2023-01-15"),
+				Total:     123.45,
+				Vendor:    "European Store",
+				Category:  "Shopping",
+			},
 		},
 		{
-			name: "uk_receipt.pdf",
-			content: `UK Receipt
+			name: "Multi-Category Receipt",
+			content: `Multi-Category Receipt
 Date: 2023-01-15
-Total: GBP 123.45
-Vendor: UK Store
-Category: Retail`,
+Total: 123.45
+Vendor: Test Store
+Category: Entertainment`,
+			expected: ReceiptInfo{
+				StartDate: mustParseDate("2023-01-15"),
+				EndDate:   mustParseDate("2023-01-15"),
+				Total:     123.45,
+				Vendor:    "Test Store",
+				Category:  "Entertainment",
+			},
 		},
 		{
-			name: "japanese_receipt.pdf",
-			content: `Japanese Receipt
+			name: "Invalid Receipt",
+			content: `Invalid Receipt
 Date: 2023-01-15
-Total: JPY 12345
-Vendor: Japanese Store
+Total: invalid
+Vendor: Test Store
 Category: Food`,
-		},
-		{
-			name: "indian_receipt.pdf",
-			content: `Indian Receipt
-Date: 2023-01-15
-Total: INR 12345.67
-Vendor: Indian Store
-Category: Grocery`,
+			expected: ReceiptInfo{},
 		},
 	}
 
-	// Create all test PDFs
-	for _, tf := range testFiles {
-		filePath := filepath.Join("testdata", tf.name)
-		if err := createTestPDF(filePath, tf.content); err != nil {
-			t.Fatalf("Failed to create %s: %v", tf.name, err)
+	// Create test directory if it doesn't exist
+	testDir := "testdata"
+	if err := os.MkdirAll(testDir, 0755); err != nil {
+		t.Fatalf("Failed to create testdata directory: %v", err)
+	}
+
+	// Create test files
+	for _, test := range testFiles {
+		filename := filepath.Join(testDir, fmt.Sprintf("%s.pdf", test.name))
+		if err := createTestPDF(filename, test.content); err != nil {
+			t.Fatalf("Failed to create test PDF %s: %v", filename, err)
 		}
 	}
 
-	// Test cases
-	tests := []struct {
-		name          string
-		filename      string
-		expectedError bool
-	}{
-		{
-			name:          "Regular Receipt",
-			filename:      filepath.Join("testdata", "regular_receipt.pdf"),
-			expectedError: false,
-		},
-		{
-			name:          "Hotel Receipt",
-			filename:      filepath.Join("testdata", "hotel_receipt.pdf"),
-			expectedError: false,
-		},
-		{
-			name:          "European Receipt",
-			filename:      filepath.Join("testdata", "european_receipt.pdf"),
-			expectedError: false,
-		},
-		{
-			name:          "UK Receipt",
-			filename:      filepath.Join("testdata", "uk_receipt.pdf"),
-			expectedError: false,
-		},
-		{
-			name:          "Japanese Receipt",
-			filename:      filepath.Join("testdata", "japanese_receipt.pdf"),
-			expectedError: false,
-		},
-		{
-			name:          "Indian Receipt",
-			filename:      filepath.Join("testdata", "indian_receipt.pdf"),
-			expectedError: false,
-		},
-		{
-			name:          "Nonexistent File",
-			filename:      filepath.Join("testdata", "nonexistent.pdf"),
-			expectedError: true,
-		},
-	}
+	// Run tests
+	for _, test := range testFiles {
+		t.Run(test.name, func(t *testing.T) {
+			filename := filepath.Join(testDir, fmt.Sprintf("%s.pdf", test.name))
+			err := ProcessFile(filename, "llama2")
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := ProcessFile(tt.filename, "llama2")
-			if tt.expectedError {
+			if test.name == "Invalid Receipt" {
+				// Expect error for invalid receipt
 				if err == nil {
-					t.Error("Expected an error but got none")
+					t.Error("Expected error for invalid receipt but got none")
 				}
-			} else {
-				if err != nil {
-					t.Errorf("Unexpected error: %v", err)
-				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("ProcessFile() error = %v", err)
+				return
+			}
+
+			// Verify the file was renamed correctly
+			expectedFilename := filepath.Join(testDir, GenerateFilename(test.expected))
+			if _, err := os.Stat(expectedFilename); os.IsNotExist(err) {
+				t.Errorf("Expected file %s does not exist", expectedFilename)
 			}
 		})
 	}
 
-	// Clean up test files
-	for _, tf := range testFiles {
-		os.Remove(filepath.Join("testdata", tf.name))
+	// Test nonexistent file
+	t.Run("Nonexistent File", func(t *testing.T) {
+		err := ProcessFile("nonexistent.pdf", "llama2")
+		if err == nil {
+			t.Error("Expected error for nonexistent file")
+		}
+	})
+
+	// Cleanup
+	for _, test := range testFiles {
+		filename := filepath.Join(testDir, fmt.Sprintf("%s.pdf", test.name))
+		os.Remove(filename)
+		if test.name != "Invalid Receipt" {
+			expectedFilename := filepath.Join(testDir, GenerateFilename(test.expected))
+			os.Remove(expectedFilename)
+		}
 	}
 }

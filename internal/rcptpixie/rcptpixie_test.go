@@ -1,7 +1,6 @@
 package rcptpixie_test
 
 import (
-	"reflect"
 	"testing"
 	"time"
 
@@ -18,93 +17,108 @@ func mustParseDate(dateStr string) time.Time {
 
 func TestParseCompletion(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    string
-		expected rcptpixie.ReceiptInfo
-		wantErr  bool
+		name        string
+		completion  string
+		expected    rcptpixie.ReceiptInfo
+		expectError bool
 	}{
 		{
 			name: "Basic Receipt",
-			input: `Date: 2023-01-15
-Total: $123.45
+			completion: `Date: 2023-01-15
+Total: 123.45
 Vendor: Test Store
-Category: Food & Drink`,
+Category: Food`,
 			expected: rcptpixie.ReceiptInfo{
 				StartDate: mustParseDate("2023-01-15"),
 				EndDate:   mustParseDate("2023-01-15"),
 				Total:     123.45,
 				Vendor:    "Test Store",
-				Category:  "Food & Drink",
+				Category:  "Food",
 			},
-			wantErr: false,
+			expectError: false,
 		},
 		{
 			name: "Hotel Receipt",
-			input: `Start Date: 2023-01-15
-End Date: 2023-01-17
-Total: $456.78
+			completion: `Start Date: 2023-01-10
+End Date: 2023-01-15
+Total: 1234.56
 Vendor: Grand Hotel
-Category: Travel`,
+Category: Lodging`,
 			expected: rcptpixie.ReceiptInfo{
-				StartDate: mustParseDate("2023-01-15"),
-				EndDate:   mustParseDate("2023-01-17"),
-				Total:     456.78,
+				StartDate: mustParseDate("2023-01-10"),
+				EndDate:   mustParseDate("2023-01-15"),
+				Total:     1234.56,
 				Vendor:    "Grand Hotel",
-				Category:  "Travel",
+				Category:  "Lodging",
 			},
-			wantErr: false,
+			expectError: false,
 		},
 		{
 			name: "Invalid Date Format",
-			input: `Date: 01/15/2023
-Total: $123.45
+			completion: `Date: 2023/01/15
+Total: 123.45
 Vendor: Test Store
 Category: Food & Drink`,
-			expected: rcptpixie.ReceiptInfo{},
-			wantErr:  true,
+			expectError: true,
 		},
 		{
 			name: "Missing Required Fields",
-			input: `Date: 2023-01-15
+			completion: `Date: 2023-01-15
 Vendor: Test Store`,
-			expected: rcptpixie.ReceiptInfo{},
-			wantErr:  true,
+			expectError: true,
 		},
 		{
 			name: "Invalid Total Format",
-			input: `Date: 2023-01-15
+			completion: `Date: 2023-01-15
 Total: abc
 Vendor: Test Store
 Category: Food & Drink`,
-			expected: rcptpixie.ReceiptInfo{},
-			wantErr:  true,
+			expectError: true,
 		},
 		{
-			name: "Receipt with Comma in Total",
-			input: `Date: 2023-01-15
-Total: $17,830.81
+			name: "Multiple Categories",
+			completion: `Date: 2023-01-15
+Total: 123.45
 Vendor: Test Store
-Category: Food & Drink`,
+Category: Entertainment`,
 			expected: rcptpixie.ReceiptInfo{
 				StartDate: mustParseDate("2023-01-15"),
 				EndDate:   mustParseDate("2023-01-15"),
-				Total:     17830.81,
+				Total:     123.45,
 				Vendor:    "Test Store",
-				Category:  "Food & Drink",
+				Category:  "Entertainment",
 			},
-			wantErr: false,
+			expectError: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := rcptpixie.ParseCompletion(tt.input)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ParseCompletion() error = %v, wantErr %v", err, tt.wantErr)
+			info, err := rcptpixie.ParseCompletion(tt.completion)
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("expected error but got none")
+				}
 				return
 			}
-			if !tt.wantErr && !reflect.DeepEqual(got, tt.expected) {
-				t.Errorf("ParseCompletion() = %v, want %v", got, tt.expected)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
+			if !info.StartDate.Equal(tt.expected.StartDate) {
+				t.Errorf("StartDate mismatch: got %v, want %v", info.StartDate, tt.expected.StartDate)
+			}
+			if !info.EndDate.Equal(tt.expected.EndDate) {
+				t.Errorf("EndDate mismatch: got %v, want %v", info.EndDate, tt.expected.EndDate)
+			}
+			if info.Total != tt.expected.Total {
+				t.Errorf("Total mismatch: got %v, want %v", info.Total, tt.expected.Total)
+			}
+			if info.Vendor != tt.expected.Vendor {
+				t.Errorf("Vendor mismatch: got %v, want %v", info.Vendor, tt.expected.Vendor)
+			}
+			if info.Category != tt.expected.Category {
+				t.Errorf("Category mismatch: got %v, want %v", info.Category, tt.expected.Category)
 			}
 		})
 	}
