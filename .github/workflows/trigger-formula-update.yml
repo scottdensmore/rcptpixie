@@ -14,6 +14,6 @@ jobs:
       - name: Trigger formula update
         uses: peter-evans/repository-dispatch@v3
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.PAT_TOKEN }}
           repository: scottdensmore/homebrew-tap
           event-type: update-formula 
