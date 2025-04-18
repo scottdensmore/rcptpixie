@@ -24,7 +24,8 @@ A command-line tool that automatically renames PDF receipts using AI-powered tex
 
 ```bash
 # Using Homebrew
-brew install scottdensmore/tap/rcptpixie
+brew tap scottdensmore/tap
+brew install rcptpixie
 ```
 
 ### Linux
