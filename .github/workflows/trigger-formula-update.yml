@@ -2,7 +2,7 @@ name: Trigger Formula Update
 
 on:
   release:
-    types: [published]
+    types: [published, created]
 
 permissions:
   contents: read
@@ -16,4 +16,5 @@ jobs:
         with:
           token: ${{ secrets.PAT_TOKEN }}
           repository: scottdensmore/homebrew-tap
-          event-type: update-formula 
+          event-type: update-formula
+          client-payload: '{"version": "${{ github.event.release.tag_name }}"}' 
