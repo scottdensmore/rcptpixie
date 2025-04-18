@@ -66,6 +66,9 @@ rcptpixie -model llama2:latest /path/to/receipt.pdf
 
 # Show version information
 rcptpixie -version
+
+# Enable verbose logging for debugging
+rcptpixie -verbose /path/to/receipt.pdf
 ```
 
 ### Command Line Options
@@ -73,6 +76,7 @@ rcptpixie -version
 - `-help`: Show help information
 - `-model`: Specify the Ollama model to use (default: "llama2:latest")
 - `-version`: Show version information
+- `-verbose`: Enable detailed logging for debugging (shows processing steps, PDF extraction details, and LLM interactions)
 
 ## File Naming Format
 
