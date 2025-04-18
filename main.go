@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,10 +19,12 @@ import (
 )
 
 type ReceiptInfo struct {
-	Date      string
-	Total     string
+	Date      time.Time
+	Total     float64
 	Vendor    string
 	Category  string
+	StartDate time.Time
+	EndDate   time.Time
 	StayDates string
 	IsHotel   bool
 }
@@ -40,20 +43,31 @@ func main() {
 	// Parse command line flags
 	modelName := flag.String("model", "llama3.2", "Ollama model to use")
 	showVersion := flag.Bool("version", false, "Show version information")
+	showHelp := flag.Bool("help", false, "Show help information")
+	flag.Usage = func() {
+		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %s [options] <pdf-file-or-directory>\n\n", os.Args[0])
+		fmt.Fprintf(flag.CommandLine.Output(), "Options:\n")
+		flag.PrintDefaults()
+		fmt.Fprintf(flag.CommandLine.Output(), "\nExamples:\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "  %s receipt.pdf\n", os.Args[0])
+		fmt.Fprintf(flag.CommandLine.Output(), "  %s -model llama3.2 ./receipts/\n", os.Args[0])
+	}
 	flag.Parse()
+
+	// Show help if requested or no arguments provided
+	if *showHelp || (len(flag.Args()) == 0 && !*showVersion) {
+		flag.Usage()
+		return
+	}
 
 	// Show version if requested
 	if *showVersion {
-		fmt.Println(version.Get())
+		fmt.Println(version.Get().String())
 		return
 	}
 
 	// Get input path from command line arguments
 	args := flag.Args()
-	if len(args) == 0 {
-		log.Fatal("Please provide a PDF file or directory to process")
-	}
-
 	inputPath := args[0]
 
 	// Check if the input is a directory
@@ -123,9 +137,6 @@ func processFile(filePath string, modelName string) error {
 		return fmt.Errorf("error extracting text from PDF: %v", err)
 	}
 
-	// Log extracted text for debugging
-	log.Printf("Extracted text from PDF:\n%s", textContent)
-
 	// Create prompt for the LLM
 	prompt := fmt.Sprintf(`You are a helpful assistant that extracts information from receipts. Please analyze this existing receipt and extract the following information:
 
@@ -133,17 +144,20 @@ Receipt Text:
 %s
 
 Please extract and provide ONLY the following information in this exact format:
-Date: MM/DD/YYYY
+Date: MM/DD/YYYY (for regular receipts)
+Check-in Date: MM/DD/YYYY (for hotel receipts)
+Check-out Date: MM/DD/YYYY (for hotel receipts)
 Total: XXXX.XX
 Vendor: Name
 Category: Type
-Stay Dates: MM/DD/YYYY to MM/DD/YYYY (only if this is a hotel receipt)
 
 If any field cannot be determined from the receipt, leave it empty but keep the label. For example:
 Date: 
 Total: 123.45
 Vendor: Unknown Store
-Category: Food`, textContent)
+Category: Food
+
+For hotel receipts, use Check-in Date and Check-out Date instead of Date.`, textContent)
 
 	// Create request to Ollama
 	reqBody := OllamaRequest{
@@ -162,18 +176,20 @@ Category: Food`, textContent)
 	// Send request to Ollama
 	resp, err := http.Post("http://localhost:11434/api/generate", "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
-		return fmt.Errorf("error sending request to Ollama: %v", err)
+		return fmt.Errorf("error connecting to Ollama: %v. Make sure Ollama is running and the model '%s' is available", err, modelName)
 	}
 	defer resp.Body.Close()
+
+	// Check for model not found error
+	if resp.StatusCode == http.StatusNotFound {
+		return fmt.Errorf("model '%s' not found. Please make sure the model is available in Ollama", modelName)
+	}
 
 	// Read response
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Errorf("error reading response: %v", err)
 	}
-
-	// Log the raw response for debugging
-	log.Printf("Raw Ollama response: %s", string(body))
 
 	var ollamaResp OllamaResponse
 	if err := json.Unmarshal(body, &ollamaResp); err != nil {
@@ -189,7 +205,6 @@ Category: Food`, textContent)
 				Done     bool   `json:"done"`
 			}
 			if err := json.Unmarshal([]byte(line), &streamResp); err != nil {
-				log.Printf("Error parsing streaming response line: %v", err)
 				continue
 			}
 			fullResponse.WriteString(streamResp.Response)
@@ -200,22 +215,40 @@ Category: Food`, textContent)
 		ollamaResp.Response = fullResponse.String()
 	}
 
-	// Log the parsed response for debugging
-	log.Printf("Parsed response: %s", ollamaResp.Response)
-
 	// Parse the response and create ReceiptInfo
-	info := parseLLMResponse(ollamaResp.Response)
+	info, err := parseCompletion(ollamaResp.Response)
+	if err != nil {
+		return fmt.Errorf("error parsing completion: %v", err)
+	}
 
 	// Skip renaming if we don't have enough information
-	if info.Date == "" && info.Total == "" && info.Vendor == "" && info.Category == "" {
+	if info.Date.IsZero() && info.Total == 0 && info.Vendor == "" && info.Category == "" {
 		return fmt.Errorf("could not extract enough information from the receipt")
 	}
 
 	// Generate new filename
-	newName := generateFilename(info)
+	dir := filepath.Dir(filePath)
+	baseName := filepath.Base(filePath)
+	ext := filepath.Ext(baseName)
+
+	// Format dates for filename
+	startDate := info.StartDate.Format("01-02-2006")
+	endDate := info.EndDate.Format("01-02-2006")
+
+	// Only include "to" if dates are different
+	datePart := startDate
+	if !info.StartDate.Equal(info.EndDate) {
+		datePart = fmt.Sprintf("%s to %s", startDate, endDate)
+	}
+
+	newName := fmt.Sprintf("%s - %.2f - %s - %s%s",
+		datePart,
+		info.Total,
+		strings.ReplaceAll(info.Vendor, " ", "_"),
+		strings.ReplaceAll(info.Category, " ", "_"),
+		ext)
 
 	// Rename the file
-	dir := filepath.Dir(filePath)
 	newPath := filepath.Join(dir, newName)
 	if err := os.Rename(filePath, newPath); err != nil {
 		return fmt.Errorf("error renaming file: %v", err)
@@ -225,46 +258,107 @@ Category: Food`, textContent)
 	return nil
 }
 
-func parseLLMResponse(response string) ReceiptInfo {
+func parseCompletion(completion string) (ReceiptInfo, error) {
 	info := ReceiptInfo{}
+	lines := strings.Split(completion, "\n")
 
-	lines := strings.Split(response, "\n")
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "Date:") {
-			info.Date = strings.TrimSpace(strings.TrimPrefix(line, "Date:"))
-		} else if strings.HasPrefix(line, "Total:") {
-			info.Total = strings.TrimSpace(strings.TrimPrefix(line, "Total:"))
-		} else if strings.HasPrefix(line, "Vendor:") {
-			info.Vendor = strings.TrimSpace(strings.TrimPrefix(line, "Vendor:"))
-		} else if strings.HasPrefix(line, "Category:") {
-			info.Category = strings.TrimSpace(strings.TrimPrefix(line, "Category:"))
-		} else if strings.HasPrefix(line, "Stay Dates:") {
-			info.StayDates = strings.TrimSpace(strings.TrimPrefix(line, "Stay Dates:"))
-			info.IsHotel = true
+		if line == "" {
+			continue
+		}
+
+		parts := strings.SplitN(line, ":", 2)
+		if len(parts) != 2 {
+			continue
+		}
+
+		key := strings.TrimSpace(parts[0])
+		value := strings.TrimSpace(parts[1])
+
+		switch key {
+		case "Date":
+			if value == "" {
+				continue
+			}
+			date, err := time.Parse("01/02/2006", value)
+			if err != nil {
+				return info, fmt.Errorf("invalid date format: %v", err)
+			}
+			info.StartDate = date
+			info.EndDate = date
+		case "Check-in Date":
+			if value == "" {
+				continue
+			}
+			date, err := time.Parse("01/02/2006", value)
+			if err != nil {
+				return info, fmt.Errorf("invalid check-in date format: %v", err)
+			}
+			info.StartDate = date
+			// If we don't find a check-out date, use the check-in date
+			info.EndDate = date
+		case "Check-out Date":
+			if value == "" {
+				continue
+			}
+			date, err := time.Parse("01/02/2006", value)
+			if err != nil {
+				return info, fmt.Errorf("invalid check-out date format: %v", err)
+			}
+			info.EndDate = date
+		case "Total":
+			if value == "" {
+				continue
+			}
+			// Remove currency symbol and commas
+			value = strings.TrimPrefix(value, "$")
+			value = strings.ReplaceAll(value, ",", "")
+			total, err := strconv.ParseFloat(value, 64)
+			if err != nil {
+				return info, fmt.Errorf("invalid total format: %v", err)
+			}
+			info.Total = total
+		case "Vendor":
+			info.Vendor = value
+		case "Category":
+			info.Category = value
 		}
 	}
 
-	return info
+	// Validate required fields
+	if info.StartDate.IsZero() {
+		return info, fmt.Errorf("no valid date found in receipt")
+	}
+	if info.Total == 0 {
+		return info, fmt.Errorf("no valid total found in receipt")
+	}
+	if info.Vendor == "" {
+		return info, fmt.Errorf("no vendor found in receipt")
+	}
+	if info.Category == "" {
+		return info, fmt.Errorf("no category found in receipt")
+	}
+
+	return info, nil
 }
 
 func generateFilename(info ReceiptInfo) string {
-	// Format the date
-	date, err := time.Parse("01/02/2006", info.Date)
-	if err != nil {
-		date = time.Now() // Fallback to current date if parsing fails
+	var dateStr string
+	if info.StartDate.Equal(info.EndDate) {
+		dateStr = info.StartDate.Format("01-02-2006")
+	} else {
+		dateStr = fmt.Sprintf("%s to %s",
+			info.StartDate.Format("01-02-2006"),
+			info.EndDate.Format("01-02-2006"))
 	}
-	formattedDate := date.Format("01-02-2006")
 
-	// Clean up the vendor name
 	vendor := strings.ReplaceAll(info.Vendor, " ", "_")
+	category := strings.ReplaceAll(info.Category, " ", "_")
 
-	// Generate the filename
-	if info.IsHotel {
-		return fmt.Sprintf("%s to %s - %s - %s - %s.pdf",
-			formattedDate, info.StayDates, info.Total, vendor, info.Category)
-	}
-
-	return fmt.Sprintf("%s - %s - %s - %s.pdf",
-		formattedDate, info.Total, vendor, info.Category)
+	return fmt.Sprintf("%s - %.2f - %s - %s.pdf",
+		dateStr,
+		info.Total,
+		vendor,
+		category)
 }
