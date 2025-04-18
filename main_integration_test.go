@@ -8,6 +8,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/dslipak/pdf"
+	"github.com/jung-kurt/gofpdf"
 )
 
 func checkOllamaAvailable() bool {
@@ -50,6 +53,20 @@ func checkModelAvailable(model string) bool {
 	return false
 }
 
+func createTestPDF(content string, outputPath string) error {
+	pdf := gofpdf.New("P", "mm", "A4", "")
+	pdf.AddPage()
+	pdf.SetFont("Arial", "", 12)
+
+	// Write each line of content
+	for _, line := range strings.Split(content, "\n") {
+		pdf.MultiCell(0, 10, line, "", "", false)
+	}
+
+	// Save the PDF
+	return pdf.OutputFileAndClose(outputPath)
+}
+
 func TestPDFProcessing(t *testing.T) {
 	// Skip if running in CI or if integration tests are disabled
 	if os.Getenv("SKIP_INTEGRATION_TESTS") != "" {
@@ -61,12 +78,34 @@ func TestPDFProcessing(t *testing.T) {
 		t.Skip("Ollama is not available")
 	}
 
-	// Create a temporary directory for test files
-	tempDir, err := os.MkdirTemp("", "rcptpixie-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp directory: %v", err)
-	}
-	defer os.RemoveAll(tempDir)
+	// Create test PDFs
+	regularContent := `Test Store
+123 Main St
+Anytown, USA
+
+Date: 01/15/2023
+Total: $123.45
+
+Food
+Tax: $10.00
+Total: $123.45
+
+Thank you for shopping at Test Store!`
+
+	hotelContent := `Test Hotel
+456 Hotel Ave
+Anytown, USA
+
+Check-in Date: 01/15/2023
+Check-out Date: 01/17/2023
+Total: $500.00
+
+Lodging
+Room: $450.00
+Tax: $50.00
+Total: $500.00
+
+Thank you for staying at Test Hotel!`
 
 	tests := []struct {
 		name          string
@@ -76,6 +115,7 @@ func TestPDFProcessing(t *testing.T) {
 		expectedError bool
 		errorContains string
 		skipIfNoModel bool
+		content       string
 	}{
 		{
 			name:          "Regular Receipt",
@@ -83,6 +123,7 @@ func TestPDFProcessing(t *testing.T) {
 			expectedName:  "01-15-2023 - 123.45 - Test_Store - Food.pdf",
 			modelName:     "llama2:latest",
 			skipIfNoModel: true,
+			content:       regularContent,
 		},
 		{
 			name:          "Hotel Receipt",
@@ -90,6 +131,7 @@ func TestPDFProcessing(t *testing.T) {
 			expectedName:  "01-15-2023 to 01-17-2023 - 500.00 - Test_Hotel - Lodging.pdf",
 			modelName:     "llama2:latest",
 			skipIfNoModel: true,
+			content:       hotelContent,
 		},
 		{
 			name:          "Invalid Model",
@@ -97,6 +139,7 @@ func TestPDFProcessing(t *testing.T) {
 			modelName:     "nonexistent-model",
 			expectedError: true,
 			errorContains: "model 'nonexistent-model' not found",
+			content:       regularContent,
 		},
 	}
 
@@ -107,27 +150,26 @@ func TestPDFProcessing(t *testing.T) {
 				t.Skipf("Model %s not available", tt.modelName)
 			}
 
-			// Copy test PDF to temp directory
-			inputPath := filepath.Join("testdata", tt.inputFileName)
-			tempPath := filepath.Join(tempDir, tt.inputFileName)
+			// Create a temporary directory for this test
+			tempDir, err := os.MkdirTemp("", "rcptpixie-test-*")
+			if err != nil {
+				t.Fatalf("Failed to create temp directory: %v", err)
+			}
+			defer os.RemoveAll(tempDir)
 
-			// Skip if test file doesn't exist (allows partial testing)
-			if _, err := os.Stat(inputPath); os.IsNotExist(err) {
-				t.Skipf("Test file %s not found", inputPath)
+			// Create the test PDF
+			inputPath := filepath.Join(tempDir, tt.inputFileName)
+			if err := createTestPDF(tt.content, inputPath); err != nil {
+				t.Fatalf("Failed to create test PDF: %v", err)
 			}
 
-			input, err := os.ReadFile(inputPath)
-			if err != nil {
-				t.Fatalf("Failed to read test file: %v", err)
-			}
-
-			err = os.WriteFile(tempPath, input, 0644)
-			if err != nil {
-				t.Fatalf("Failed to write temp file: %v", err)
+			// Verify the PDF can be read
+			if _, err := pdf.Open(inputPath); err != nil {
+				t.Fatalf("Failed to open test PDF: %v", err)
 			}
 
 			// Process the file
-			err = processFile(tempPath, tt.modelName)
+			err = processFile(inputPath, tt.modelName)
 
 			// Check error cases
 			if tt.expectedError {

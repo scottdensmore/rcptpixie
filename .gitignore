@@ -26,3 +26,6 @@ go.work
 
 # Test directory
 test/ 
+
+# Test data
+testdata/ 
