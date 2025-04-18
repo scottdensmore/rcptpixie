@@ -2,7 +2,7 @@ name: Trigger Formula Update
 
 on:
   release:
-    types: [published, created]
+    types: [published]
 
 permissions:
   contents: read
