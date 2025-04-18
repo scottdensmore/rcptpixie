@@ -1,5 +1,9 @@
 # RcptPixie
 
+[![Build](https://github.com/scottdensmore/rcptpixie/actions/workflows/build.yml/badge.svg)](https://github.com/scottdensmore/rcptpixie/actions/workflows/build.yml)
+[![Test](https://github.com/scottdensmore/rcptpixie/actions/workflows/test.yml/badge.svg)](https://github.com/scottdensmore/rcptpixie/actions/workflows/test.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/scottdensmore/rcptpixie)](https://goreportcard.com/report/github.com/scottdensmore/rcptpixie)
+
 A command-line tool that automatically renames PDF receipts using AI-powered text extraction.
 
 ## Features
