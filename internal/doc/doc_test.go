@@ -10,6 +10,7 @@ import (
 	"image/color"
 	"image/png"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -320,6 +321,40 @@ func scannedPDF(t *testing.T) string {
 	return buildPDF(t, filepath.Join(t.TempDir(), "scanned.pdf"), []page{{}, {}})
 }
 
+// stubRaster renders a fixed, valid PNG. The wiring from "this PDF has no text"
+// to "these base64 images" is what this package owns; whether a given third
+// party binary is installed and working is not, and testing both at once made
+// this fail on a Mac (sips writes blank pages) and on Windows (magick without
+// its ghostscript delegate).
+type stubRaster struct{ pages int }
+
+func (s stubRaster) Name() string { return "stub" }
+
+func (s stubRaster) Convert(ctx context.Context, imgPath string) ([]byte, error) {
+	return onePNG(), nil
+}
+
+func (s stubRaster) Render(ctx context.Context, pdfPath string, pages int) ([][]byte, error) {
+	n := min(s.pages, pages)
+	out := make([][]byte, 0, n)
+	for i := 0; i < n; i++ {
+		out = append(out, onePNG())
+	}
+	return out, nil
+}
+
+func onePNG() []byte {
+	var buf bytes.Buffer
+	img := image.NewGray(image.Rect(0, 0, 8, 8))
+	for i := range img.Pix {
+		img.Pix[i] = uint8(i * 3) // not blank; the blank check rejects flat white
+	}
+	if err := png.Encode(&buf, img); err != nil {
+		panic(err)
+	}
+	return buf.Bytes()
+}
+
 func TestLoadScannedGoesToVision(t *testing.T) {
 	path := scannedPDF(t)
 
@@ -332,10 +367,25 @@ func TestLoadScannedGoesToVision(t *testing.T) {
 		t.Errorf("error does not name poppler: %v", err)
 	}
 
-	r := doc.Detect(nil)
-	if r.Name() == "none" {
-		t.Skip("no rasterizer on PATH")
+	assertVision(t, path, stubRaster{pages: 2})
+}
+
+// TestLoadScannedWithRealRasterizer exercises the genuine tool, but only
+// pdftoppm: it is the one candidate verified to render rather than to merely be
+// installed.
+func TestLoadScannedWithRealRasterizer(t *testing.T) {
+	if _, err := exec.LookPath("pdftoppm"); err != nil {
+		t.Skip("pdftoppm is not on PATH")
 	}
+	r := doc.Detect(nil)
+	if r.Name() != "pdftoppm" {
+		t.Skipf("rasterizer is %s, not pdftoppm", r.Name())
+	}
+	assertVision(t, scannedPDF(t), r)
+}
+
+func assertVision(t *testing.T, path string, r doc.Rasterizer) {
+	t.Helper()
 	d, err := doc.Load(context.Background(), path, r, nil)
 	if err != nil {
 		t.Fatalf("Load with %s: %v", r.Name(), err)

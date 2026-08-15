@@ -15,7 +15,14 @@ import (
 func TestToolPath(t *testing.T) {
 	t.Parallel()
 
-	abs := filepath.Join(string(filepath.Separator), "tmp", "-scan.pdf")
+	// filepath.Join("/", ...) is NOT absolute on Windows — an absolute path there
+	// needs a drive letter — so build a real one and keep the rooted form as its
+	// own case.
+	abs, err := filepath.Abs(filepath.Join("tmp", "-scan.pdf"))
+	if err != nil {
+		t.Fatalf("Abs: %v", err)
+	}
+	rooted := filepath.Join(string(filepath.Separator), "tmp", "-scan.pdf")
 	dot := "." + string(filepath.Separator)
 
 	tests := []struct{ in, want string }{
@@ -23,6 +30,7 @@ func TestToolPath(t *testing.T) {
 		{"receipt.pdf", dot + "receipt.pdf"},
 		{filepath.Join("sub", "-x.pdf"), dot + filepath.Join("sub", "-x.pdf")},
 		{abs, abs},
+		{rooted, rooted},
 		{"", ""},
 	}
 	for _, tt := range tests {

@@ -101,12 +101,12 @@ func firstOnPath(names []string) string {
 	return ""
 }
 
+// Name reports the tool that will RENDER, which is what every caller uses it
+// for. Falling back to the converter's name here claimed a rasterizer existed on
+// any Mac with sips, when rendering was in fact unavailable.
 func (e *external) Name() string {
-	switch {
-	case e.render != "":
+	if e.render != "" {
 		return e.render
-	case e.convert != "":
-		return e.convert
 	}
 	return "none"
 }
@@ -229,7 +229,11 @@ func (e *external) Convert(ctx context.Context, imgPath string) ([]byte, error) 
 // itself. The prefix also keeps a colon in the name away from ImageMagick's
 // "coder:file" parsing.
 func toolPath(p string) string {
-	if p == "" || filepath.IsAbs(p) {
+	// A rooted path needs no guard either, and on Windows it is not "absolute":
+	// filepath.IsAbs(`\tmp\x.pdf`) is false there because there is no drive
+	// letter, so testing IsAbs alone would prefix a path that already cannot be
+	// mistaken for a switch.
+	if p == "" || filepath.IsAbs(p) || os.IsPathSeparator(p[0]) {
 		return p
 	}
 	return "." + string(filepath.Separator) + p
