@@ -1,4 +1,4 @@
-module github.com/scottdensmore/rcptpixie
+module github.com/scottdensmore/rcptpixie/v2
 
 go 1.24.1
 

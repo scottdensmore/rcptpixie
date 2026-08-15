@@ -12,11 +12,11 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/scottdensmore/rcptpixie/internal/analyze"
-	"github.com/scottdensmore/rcptpixie/internal/doc"
-	"github.com/scottdensmore/rcptpixie/internal/ollama"
-	"github.com/scottdensmore/rcptpixie/internal/rename"
-	"github.com/scottdensmore/rcptpixie/internal/testutil"
+	"github.com/scottdensmore/rcptpixie/v2/internal/analyze"
+	"github.com/scottdensmore/rcptpixie/v2/internal/doc"
+	"github.com/scottdensmore/rcptpixie/v2/internal/ollama"
+	"github.com/scottdensmore/rcptpixie/v2/internal/rename"
+	"github.com/scottdensmore/rcptpixie/v2/internal/testutil"
 )
 
 const testModel = "gemma4:e2b"

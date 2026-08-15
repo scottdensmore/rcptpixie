@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/scottdensmore/rcptpixie/internal/ollama"
-	"github.com/scottdensmore/rcptpixie/internal/testutil"
+	"github.com/scottdensmore/rcptpixie/v2/internal/ollama"
+	"github.com/scottdensmore/rcptpixie/v2/internal/testutil"
 )
 
 func newClient(t *testing.T, host string, timeout time.Duration) *ollama.Client {

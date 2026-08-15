@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/scottdensmore/rcptpixie/internal/ollama"
+	"github.com/scottdensmore/rcptpixie/v2/internal/ollama"
 )
 
 // defaultReceiptExts is receipts mode's filter; organize mode defaults to the

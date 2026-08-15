@@ -10,7 +10,7 @@ import (
 	"io/fs"
 	"strings"
 
-	"github.com/scottdensmore/rcptpixie/internal/rename"
+	"github.com/scottdensmore/rcptpixie/v2/internal/rename"
 )
 
 var ErrNotATTY = errors.New("confirmation required but stdin is not a terminal; pass -y to proceed")

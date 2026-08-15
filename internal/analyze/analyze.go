@@ -14,8 +14,8 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/scottdensmore/rcptpixie/internal/doc"
-	"github.com/scottdensmore/rcptpixie/internal/ollama"
+	"github.com/scottdensmore/rcptpixie/v2/internal/doc"
+	"github.com/scottdensmore/rcptpixie/v2/internal/ollama"
 )
 
 type Analyzer struct {
