@@ -117,14 +117,17 @@ go install ./cmd/rcptpixie
 
 ### macOS
 
+Use `go install` above, or the archive from the Releases page. There is no
+Homebrew tap: it was more release machinery than a single-binary tool needs.
+
 ```bash
-brew install --cask scottdensmore/tap/rcptpixie
+curl -L https://github.com/scottdensmore/rcptpixie/releases/latest/download/rcptpixie_Darwin_arm64.tar.gz | tar xz
+sudo mv rcptpixie /usr/local/bin/
 ```
 
-It is a cask, not a formula: it installs the released binary rather than
-compiling one, so no Go toolchain is needed. (Before v2.0.2 this was a formula
-that ran `go build` at the repository root, which contains no Go files — it
-could not install at all.)
+Use `rcptpixie_Darwin_x86_64.tar.gz` on an Intel Mac. The binaries are
+unsigned, so Gatekeeper quarantines a downloaded archive; clear it with
+`xattr -dr com.apple.quarantine /usr/local/bin/rcptpixie`.
 
 ### Linux
 
@@ -424,9 +427,12 @@ go install ./cmd/rcptpixie
 Version 2 is the first release of the rewrite. If you used an earlier version:
 
 - **The Go module path is now `github.com/scottdensmore/rcptpixie/v2`.** Only
-  `go install` is affected — the Homebrew formula and the release archives are
-  not. The v1 path keeps resolving to v1.1.0, so an unchanged
-  `go install .../cmd/rcptpixie@latest` quietly stays on the old version.
+  `go install` is affected — the release archives are not. The v1 path keeps
+  resolving to v1.1.0, so an unchanged `go install .../cmd/rcptpixie@latest`
+  quietly stays on the old version.
+- **The Homebrew tap is gone.** Install with `go install` or the release
+  archive. The tap's formula built from source and never worked, and keeping a
+  second repository in the release path cost more than it returned.
 - **Nothing renamed by v1 can be undone by v2.** The undo journal arrived with
   this release, so v1 renames were never recorded.
 - **Recursion is now opt-in.** A directory argument processes only its top
