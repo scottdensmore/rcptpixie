@@ -37,4 +37,9 @@ jobs:
           version: latest
           args: release --clean
         env:
-          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
+          # The built-in token, not a PAT: this publishes a release in THIS
+          # repository, which the contents:write permission above already
+          # covers. The PAT that used to be here expired and took the v2.0.0
+          # release down with a 401. A PAT is only needed to reach another
+          # repository, which is what trigger-formula-update.yml does.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
