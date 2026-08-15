@@ -92,6 +92,15 @@ that and tells you to install poppler or Ghostscript instead.
 
 ## Installation
 
+### With `go install`
+
+```bash
+go install github.com/scottdensmore/rcptpixie/v2/cmd/rcptpixie@latest
+```
+
+The `/v2` is required. Go treats each major version as its own module path, so
+the v1 path resolves to v1.1.0 and stops there.
+
 ### From source
 
 ```bash
@@ -408,8 +417,14 @@ go install ./cmd/rcptpixie
 
 ## Breaking changes
 
-If you used an earlier version:
+Version 2 is the first release of the rewrite. If you used an earlier version:
 
+- **The Go module path is now `github.com/scottdensmore/rcptpixie/v2`.** Only
+  `go install` is affected — the Homebrew formula and the release archives are
+  not. The v1 path keeps resolving to v1.1.0, so an unchanged
+  `go install .../cmd/rcptpixie@latest` quietly stays on the old version.
+- **Nothing renamed by v1 can be undone by v2.** The undo journal arrived with
+  this release, so v1 renames were never recorded.
 - **Recursion is now opt-in.** A directory argument processes only its top
   level; pass `-r` for subdirectories. (Previously every subdirectory was
   descended into automatically.) Skipped subdirectories are reported.

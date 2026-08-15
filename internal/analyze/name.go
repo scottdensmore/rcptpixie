@@ -8,7 +8,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/scottdensmore/rcptpixie/internal/rename"
+	"github.com/scottdensmore/rcptpixie/v2/internal/rename"
 )
 
 type Receipt struct {

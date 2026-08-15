@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/scottdensmore/rcptpixie/internal/rename"
+	"github.com/scottdensmore/rcptpixie/v2/internal/rename"
 )
 
 func writeFile(t *testing.T, path, content string) {

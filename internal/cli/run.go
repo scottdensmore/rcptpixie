@@ -13,10 +13,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/scottdensmore/rcptpixie/internal/analyze"
-	"github.com/scottdensmore/rcptpixie/internal/doc"
-	"github.com/scottdensmore/rcptpixie/internal/ollama"
-	"github.com/scottdensmore/rcptpixie/internal/rename"
+	"github.com/scottdensmore/rcptpixie/v2/internal/analyze"
+	"github.com/scottdensmore/rcptpixie/v2/internal/doc"
+	"github.com/scottdensmore/rcptpixie/v2/internal/ollama"
+	"github.com/scottdensmore/rcptpixie/v2/internal/rename"
 )
 
 func runReceipts(ctx context.Context, env Env, args []string) ExitCode {

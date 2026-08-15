@@ -18,7 +18,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/scottdensmore/rcptpixie/internal/doc"
+	"github.com/scottdensmore/rcptpixie/v2/internal/doc"
 )
 
 // fixture returns the path of a committed testdata file, skipping the test when

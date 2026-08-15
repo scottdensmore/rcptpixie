@@ -6,7 +6,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/scottdensmore/rcptpixie/internal/cli"
+	"github.com/scottdensmore/rcptpixie/v2/internal/cli"
 )
 
 func main() {

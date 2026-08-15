@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/scottdensmore/rcptpixie/internal/doc"
+	"github.com/scottdensmore/rcptpixie/v2/internal/doc"
 )
 
 const (

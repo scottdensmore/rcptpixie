@@ -10,7 +10,7 @@ import (
 	"runtime/debug"
 	"strings"
 
-	"github.com/scottdensmore/rcptpixie/version"
+	"github.com/scottdensmore/rcptpixie/v2/version"
 )
 
 type ExitCode int

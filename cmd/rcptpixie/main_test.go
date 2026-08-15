@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/scottdensmore/rcptpixie/internal/testutil"
+	"github.com/scottdensmore/rcptpixie/v2/internal/testutil"
 )
 
 // binary is the compiled CLI under test. These tests exec it rather than call

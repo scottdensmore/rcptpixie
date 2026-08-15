@@ -468,6 +468,19 @@ half-renamed.**
   optional coverage: releases ship a Windows binary, and the reserved device
   names and trailing-dot rules in the sanitizer only matter there.
 
+## Module path
+
+`github.com/scottdensmore/rcptpixie/v2`. The `/v2` suffix is mandatory, not
+stylistic: a repository tagged `v2.x` whose `go.mod` omits it fails every fetch
+with `invalid version: should be v0 or v1, not v2`, including
+`go install ...@latest`, and that failure hits people who never asked for v2.
+
+Two places repeat the path and cannot be checked by the compiler: the `-X`
+linker flags in `.goreleaser.yml`, and the install command in the README. The
+linker accepts an `-X` for a symbol that does not exist without complaint, so a
+stale path there ships binaries reporting `version dev`.
+`version/version_test.go` asserts the two files agree; keep it.
+
 ## Dependencies
 
 **Exactly one production dependency: `github.com/ledongthuc/pdf`.**

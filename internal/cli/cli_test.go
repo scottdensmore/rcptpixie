@@ -17,9 +17,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/scottdensmore/rcptpixie/internal/ollama"
-	"github.com/scottdensmore/rcptpixie/internal/rename"
-	"github.com/scottdensmore/rcptpixie/internal/testutil"
+	"github.com/scottdensmore/rcptpixie/v2/internal/ollama"
+	"github.com/scottdensmore/rcptpixie/v2/internal/rename"
+	"github.com/scottdensmore/rcptpixie/v2/internal/testutil"
 )
 
 const testModel = "gemma4:e2b"
