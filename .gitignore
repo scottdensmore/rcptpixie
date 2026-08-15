@@ -4,7 +4,11 @@
 *.dll
 *.so
 *.dylib
-rcptpixie
+# Root-anchored: an unanchored "rcptpixie" also matches the cmd/rcptpixie and
+# internal/rcptpixie source directories, silently hiding every file in them.
+/rcptpixie
+# Left behind by `go build ./...` inside the nested fixture-generator module.
+/scripts/genfixtures/rcptpixie-genfixtures
 
 # Test binary, built with `go test -c`
 *.test
@@ -22,10 +26,7 @@ go.work
 .idea/
 .vscode/
 *.swp
-*.swo 
+*.swo
 
-# Test directory
-test/ 
-
-# Test data
-testdata/ 
+# NOTE: testdata/ is deliberately NOT ignored. Go's tooling treats testdata/ as
+# the standard home for fixtures, and they need to be committed to be useful.

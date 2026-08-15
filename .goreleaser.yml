@@ -1,8 +1,13 @@
+version: 2
+
 project_name: rcptpixie
 
 before:
   hooks:
-    - go mod tidy
+    # Not "go mod tidy": tidy resolves dependencies at release time and can
+    # rewrite go.mod/go.sum mid-run, dirtying the tree and aborting the release.
+    # Tidiness is enforced in the PR lint job instead.
+    - go mod download
 
 builds:
   - main: ./cmd/rcptpixie
@@ -15,10 +20,6 @@ builds:
     goarch:
       - amd64
       - arm64
-    ignore:
-      - goos: darwin
-        goarch: arm64
-        goarm: 7
     ldflags:
       - -s -w
       - -X github.com/scottdensmore/rcptpixie/version.Version={{.Version}}
@@ -26,7 +27,7 @@ builds:
       - -X github.com/scottdensmore/rcptpixie/version.BuildDate={{.Date}}
 
 archives:
-  - format: tar.gz
+  - formats: [tar.gz]
     name_template: >-
       {{ .ProjectName }}_
       {{- title .Os }}_
@@ -35,7 +36,7 @@ archives:
       {{- else }}{{ .Arch }}{{ end }}
     format_overrides:
       - goos: windows
-        format: zip
+        formats: [zip]
 
 checksum:
   name_template: 'checksums.txt'
@@ -51,4 +52,4 @@ changelog:
       - '^test:'
       - '^ci:'
       - '^chore:'
-      - '^build:' 
+      - '^build:'

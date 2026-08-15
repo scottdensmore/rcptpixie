@@ -16,4 +16,7 @@ jobs:
         with:
           token: ${{ secrets.PAT_TOKEN }}
           repository: scottdensmore/homebrew-tap
-          event-type: update-formula 
+          event-type: update-formula
+          # Name the version explicitly. Without it the tap has to guess which
+          # release fired this, and races the next tag if two land close together.
+          client-payload: '{"tag": "${{ github.event.release.tag_name }}"}' 
