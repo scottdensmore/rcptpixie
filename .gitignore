@@ -30,3 +30,6 @@ go.work
 
 # NOTE: testdata/ is deliberately NOT ignored. Go's tooling treats testdata/ as
 # the standard home for fixtures, and they need to be committed to be useful.
+
+# GoReleaser build output
+/dist/

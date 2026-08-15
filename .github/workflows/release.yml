@@ -30,6 +30,17 @@ jobs:
 
       # v6 tracks GoReleaser v2; it must stay in step with "version: 2" in
       # .goreleaser.yml.
+      # A missing tap token must cost the cask update, never the binaries.
+      - name: Decide whether the Homebrew cask can be published
+        id: brew
+        run: |
+          if [ -n "${{ secrets.HOMEBREW_TAP_TOKEN }}" ]; then
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::HOMEBREW_TAP_TOKEN is not set; publishing binaries but skipping the Homebrew cask."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
@@ -40,6 +51,8 @@ jobs:
           # The built-in token, not a PAT: this publishes a release in THIS
           # repository, which the contents:write permission above already
           # covers. The PAT that used to be here expired and took the v2.0.0
-          # release down with a 401. A PAT is only needed to reach another
-          # repository, which is what trigger-formula-update.yml does.
+          # release down with a 401.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Cross-repository write; the built-in token cannot reach the tap.
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          SKIP_BREW: ${{ steps.brew.outputs.skip }}

@@ -118,9 +118,13 @@ go install ./cmd/rcptpixie
 ### macOS
 
 ```bash
-brew tap scottdensmore/tap
-brew install rcptpixie
+brew install --cask scottdensmore/tap/rcptpixie
 ```
+
+It is a cask, not a formula: it installs the released binary rather than
+compiling one, so no Go toolchain is needed. (Before v2.0.2 this was a formula
+that ran `go build` at the repository root, which contains no Go files — it
+could not install at all.)
 
 ### Linux
 
