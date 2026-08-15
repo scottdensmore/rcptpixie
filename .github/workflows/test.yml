@@ -12,46 +12,51 @@ on:
     branches: [ main ]
 
 jobs:
-  test:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.ref }}
-      
+          ref: ${{ inputs.ref || github.ref }}
+
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version-file: go.mod
 
-      - name: Install dependencies
-        run: go mod download
+      - name: gofmt
+        run: gofmt -l . | tee /dev/stderr | (! read)
 
-      - name: Install Ollama
-        run: curl -fsSL https://ollama.com/install.sh | sh
-      
-      - name: Run ollama
+      - name: go vet
+        run: go vet ./...
+
+      - name: go.mod is tidy
         run: |
-          ollama serve &
-          ollama pull llama2
-    
-      - name: Wait for Ollama to start
-        run: |
-          for i in {1..30}; do
-            if curl -s http://localhost:11434/api/tags > /dev/null; then
-              echo "Ollama is ready!"
-              break
-            fi
-            if [ $i -eq 30 ]; then
-              echo "Ollama failed to start within 30 seconds"
-              journalctl -u ollama.service # Log output for debugging
-              exit 1
-            fi
-            echo "Waiting for Ollama to start... ($i/30)"
-            sleep 1
-          done
+          go mod tidy
+          git diff --exit-code go.mod go.sum
 
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      # One runner gets a real rasterizer so the vision path is exercised rather
+      # than skipped everywhere.
+      - name: Install poppler
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install -y poppler-utils
+
+      # No Ollama: every test that needs the API uses an httptest fake.
       - name: Run tests
-        run: go test -v ./...
-        env:
-          SKIP_INTEGRATION_TESTS: "false"
+        run: go test -race ./...
