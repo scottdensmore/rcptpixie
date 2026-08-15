@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -393,6 +394,9 @@ func TestCollectNonRecursiveSkipsSubdirs(t *testing.T) {
 }
 
 func TestCollectRecursiveTolerantOfUnreadableEntry(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("chmod 0000 does not deny directory listing on Windows")
+	}
 	if os.Geteuid() == 0 {
 		t.Skip("root ignores directory permissions")
 	}
@@ -515,6 +519,11 @@ func TestUndoAcceptsFlagsAfterPositional(t *testing.T) {
 // blocks until a writer appears and no timeout covers it. The same fifo inside a
 // directory is already dropped by candidate().
 func TestExplicitNonRegularFileIsRefused(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// The runners ship MSYS, so mkfifo resolves, but it produces an ordinary
+		// file there rather than a pipe and the refusal never triggers.
+		t.Skip("no FIFOs on Windows")
+	}
 	if _, err := exec.LookPath("mkfifo"); err != nil {
 		t.Skip("mkfifo is unavailable")
 	}

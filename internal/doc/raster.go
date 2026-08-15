@@ -71,16 +71,17 @@ func unavailable() Rasterizer {
 	return &external{log: orDiscard(nil)}
 }
 
+// renderCandidates deliberately excludes sips. sips reads a PDF without
+// complaint and writes an all-white image for it, which the blank check then
+// rejects on every scanned file — a Mac with no other tool is better served by
+// "install poppler" than by a per-file blank-page error. sips remains a
+// converter, which is the job it does well.
 func renderCandidates() []string {
 	c := []string{"pdftoppm"}
 	if runtime.GOOS == "windows" {
 		c = append(c, "gswin64c", "gswin32c")
 	}
-	c = append(c, "gs", "magick", "convert")
-	if runtime.GOOS == "darwin" {
-		c = append(c, "sips")
-	}
-	return c
+	return append(c, "gs", "magick", "convert")
 }
 
 func convertCandidates() []string {

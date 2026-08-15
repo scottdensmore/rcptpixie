@@ -1000,8 +1000,11 @@ func TestContextCancellationStopsWork(t *testing.T) {
 	if _, err := a.Receipt(ctx, textDoc("receipt text")); err == nil {
 		t.Fatal("Receipt succeeded after the context expired")
 	}
-	if n := fake.Count(); n != 1 {
-		t.Errorf("made %d requests, want 1: a cancelled context must not be retried", n)
+	// At most one: zero is legitimate when the deadline expires before the
+	// request is dispatched, which a loaded parallel run does reach. Anything
+	// above one is the actual defect — a retry of a context that is already dead.
+	if n := fake.Count(); n > 1 {
+		t.Errorf("made %d requests, want at most 1: a cancelled context must not be retried", n)
 	}
 }
 

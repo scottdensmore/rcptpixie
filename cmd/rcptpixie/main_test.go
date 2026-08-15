@@ -75,50 +75,19 @@ const receiptReply = `{"is_hotel":false,"vendor":"Test Store","date":"2023-01-15
 
 const subjectReply = `{"date":"2024-03-11","subject":"Comcast Internet Service Invoice"}`
 
-// receiptPDF writes a one-page PDF with a readable text layer.
+// receiptPDF puts a PDF with a real text layer at dir/name. It copies the
+// committed fixture rather than synthesising one: a hand-rolled PDF landed under
+// doc.MinTextChars once the whitespace was discounted, which sent these tests
+// down the rasterizer path and made them depend on poppler being installed.
+// They are here to exercise the CLI wiring, not the vision fallback.
 func receiptPDF(t *testing.T, dir, name string) string {
 	t.Helper()
-	lines := []string{
-		"Test Store",
-		"123 Main Street",
-		"Date: 2023-01-15",
-		"TOTAL              123.45",
+	src, err := os.ReadFile(filepath.Join("..", "..", "testdata", "receipt-text.pdf"))
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
 	}
-	var content strings.Builder
-	content.WriteString("BT\n/F1 12 Tf\n72 720 Td\n14 TL\n")
-	for i, line := range lines {
-		if i > 0 {
-			content.WriteString("T*\n")
-		}
-		fmt.Fprintf(&content, "(%s) Tj\n", line)
-	}
-	content.WriteString("ET\n")
-
-	objs := []string{
-		"<< /Type /Catalog /Pages 2 0 R >>",
-		"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-		"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>",
-		fmt.Sprintf("<< /Length %d >>\nstream\n%s\nendstream", content.Len(), content.String()),
-		"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-	}
-
-	var buf bytes.Buffer
-	buf.WriteString("%PDF-1.4\n")
-	offsets := make([]int, len(objs))
-	for i, body := range objs {
-		offsets[i] = buf.Len()
-		fmt.Fprintf(&buf, "%d 0 obj\n%s\nendobj\n", i+1, body)
-	}
-	xref := buf.Len()
-	fmt.Fprintf(&buf, "xref\n0 %d\n", len(objs)+1)
-	buf.WriteString("0000000000 65535 f \n")
-	for _, off := range offsets {
-		fmt.Fprintf(&buf, "%010d 00000 n \n", off)
-	}
-	fmt.Fprintf(&buf, "trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n", len(objs)+1, xref)
-
 	path := filepath.Join(dir, name)
-	if err := os.WriteFile(path, buf.Bytes(), 0o644); err != nil {
+	if err := os.WriteFile(path, src, 0o644); err != nil {
 		t.Fatalf("write %s: %v", path, err)
 	}
 	return path
