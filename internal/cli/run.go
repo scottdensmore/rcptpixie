@@ -80,7 +80,7 @@ func execute(ctx context.Context, env Env, args []string, mode string) ExitCode 
 	}
 
 	raster := doc.Detect(log)
-	an := &analyze.Analyzer{C: client, Model: o.Model, Log: log}
+	an := &analyze.Analyzer{C: client, Model: o.Model, Log: log, DateOrder: analyze.ParseDateOrder(o.DateOrder)}
 
 	var (
 		files       []string

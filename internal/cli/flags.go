@@ -3,6 +3,7 @@ package cli
 import (
 	"errors"
 	"flag"
+	"fmt"
 	"io"
 	"strings"
 	"time"
@@ -23,6 +24,7 @@ type opts struct {
 	Timeout                                time.Duration
 	Recursive, DryRun, Yes, Verbose, Quiet bool
 	Exts                                   string
+	DateOrder                              string
 }
 
 // newFlagSet always uses ContinueOnError. ExitOnError makes Parse call
@@ -50,6 +52,8 @@ func (o *opts) register(fs *flag.FlagSet, getenv func(string) string) {
 	fs.StringVar(&o.Host, "host", host, "ollama base URL (env RCPTPIXIE_HOST, OLLAMA_HOST)")
 	fs.DurationVar(&o.Timeout, "timeout", defaultTimeout, "timeout for a single ollama request")
 	fs.StringVar(&o.Exts, "ext", o.Exts, "comma-separated extensions to consider (empty means every file)")
+	fs.StringVar(&o.DateOrder, "date-order", "auto",
+		"how a numeric date like 06/03/2025 is written: auto, day-first or month-first")
 
 	// The stdlib flag package has no aliases, so each short form is a second
 	// binding onto the same target.
@@ -71,6 +75,13 @@ func (o *opts) register(fs *flag.FlagSet, getenv func(string) string) {
 func (o *opts) validate(fs *flag.FlagSet) error {
 	if o.Verbose && o.Quiet {
 		return errors.New("-verbose and -quiet cannot be used together")
+	}
+	if fs.Lookup("date-order") != nil {
+		switch o.DateOrder {
+		case "", "auto", "day-first", "month-first":
+		default:
+			return fmt.Errorf("-date-order must be auto, day-first or month-first, not %q", o.DateOrder)
+		}
 	}
 	if fs.Lookup("host") == nil {
 		return nil
