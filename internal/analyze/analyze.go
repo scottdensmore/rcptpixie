@@ -67,12 +67,14 @@ func (e *UnparseableError) Error() string {
 }
 
 type receiptWire struct {
-	IsHotel  bool   `json:"is_hotel"`
-	Vendor   string `json:"vendor"`
-	Date     string `json:"date"`
-	EndDate  string `json:"end_date"`
-	Total    number `json:"total"`
-	Category string `json:"category"`
+	IsHotel   bool   `json:"is_hotel"`
+	Vendor    string `json:"vendor"`
+	Date      string `json:"date"`
+	DateRaw   string `json:"date_raw"`
+	DateOrder string `json:"date_order"`
+	EndDate   string `json:"end_date"`
+	Total     number `json:"total"`
+	Category  string `json:"category"`
 }
 
 type subjectWire struct {
@@ -290,10 +292,29 @@ func (a *Analyzer) receiptFrom(w receiptWire, d *doc.Doc) (Receipt, error) {
 		return Receipt{}, errNoVendor
 	}
 
+	order := parseOrder(w.DateOrder)
 	start, ok := parseDate(w.Date)
 	if !ok || !plausibleDate(start) {
-		return Receipt{}, errNoDate
+		// The model sometimes copies the printed date correctly and then
+		// scrambles its own ISO rendering of it. The copy is the better source.
+		if rescued, rok := dateFromRaw(w.DateRaw, order); rok {
+			a.log().Warn("the model's date was unusable, reading the printed one instead",
+				"path", d.Path, "date", w.Date, "printed", w.DateRaw)
+			start = rescued
+		} else {
+			return Receipt{}, errNoDate
+		}
 	}
+	// 06/03/2025 is the third of June in Dallas and the sixth of March in Dublin.
+	// The model reports the date as printed and what the document says about the
+	// convention; deciding between the two readings is arithmetic, done here.
+	if fixed, changed := resolveAmbiguousDate(start, w.DateRaw, order); changed {
+		a.log().Debug("re-read an ambiguous date using the document's own convention",
+			"path", d.Path, "printed", w.DateRaw, "order", w.DateOrder,
+			"was", start.Format("2006-01-02"), "now", fixed.Format("2006-01-02"))
+		start = fixed
+	}
+
 	end := start
 	if w.IsHotel {
 		if e, ok := parseDate(w.EndDate); ok && plausibleDate(e) {
