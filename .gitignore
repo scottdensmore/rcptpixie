@@ -30,6 +30,12 @@ go.work
 
 # NOTE: testdata/ is deliberately NOT ignored. Go's tooling treats testdata/ as
 # the standard home for fixtures, and they need to be committed to be useful.
+#
+# testdata/real/ is the exception: it holds YOUR receipts for the eval harness,
+# and a receipt carries a name, a card fragment and where you were on a given
+# day. It stays local. Nothing reads it but the eval build tag, and nothing
+# sends it anywhere but the Ollama on this machine.
+/testdata/real/
 
 # GoReleaser build output
 /dist/
