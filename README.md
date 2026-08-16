@@ -22,6 +22,10 @@ Scan_20240311_0004.pdf ->  2024-03-11 - Comcast Internet Service Invoice.pdf
 - **Handles regular and hotel receipts**, including check-in/check-out ranges.
 - **Understands messy totals** — `$1,234.56`, `1.234,56`, `12.00 USD` and
   `(12.00)` all parse (covered by tests in `internal/analyze`).
+- **Reads a date the way the document writes it.** `06/03/2025` is the third of
+  June in Dallas and the sixth of March in Dublin; rcptpixie decides from the
+  receipt's own currency, language and address, or from `-date-order` when you
+  would rather just say.
 - **Dry run** (`-n`) prints the exact plan and changes nothing.
 - **Undo** — every rename is journaled and reversible with `rcptpixie undo`.
 - **Never overwrites a file.** Collisions get a ` (2)` suffix.
@@ -441,7 +445,8 @@ rcptpixie/
 │   ├── rename/             # sanitizer, plan/collisions, atomic apply, undo journal
 │   └── testutil/           # httptest fake Ollama server
 ├── scripts/
-│   └── genfixtures/        # nested module that regenerates testdata/
+│   ├── genfixtures/        # nested module that regenerates testdata/
+│   └── genphotos/          # makes photographed-looking receipts for the eval
 ├── testdata/               # committed PDF/image fixtures (see testdata/README.md)
 ├── version/
 ├── go.mod
