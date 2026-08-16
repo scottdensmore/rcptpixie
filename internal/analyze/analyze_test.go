@@ -1172,3 +1172,75 @@ func TestContextSizeNeverShrinksWithinARun(t *testing.T) {
 		t.Errorf("the context shrank back to %v after the scan (%v), which reloads the model on every alternation", got[2], got)
 	}
 }
+
+// End to end through the analyzer: a US coffee shop prints 06/03/2025 and the
+// model reads it as the sixth of March. The document says month-first, so the
+// filename must still carry June 3rd.
+func TestAmbiguousDateIsResolvedFromTheDocument(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name       string
+		modelDate  string
+		raw, order string
+		want       string
+	}{
+		{"swapped, month-first document", "2025-03-06", "06/03/2025", "month-first",
+			"06-03-2025 - 10.00 - Blue_Bottle - Food.pdf"},
+		{"swapped, day-first document", "2024-07-04", "07/04/2024", "day-first",
+			"04-07-2024 - 10.00 - Blue_Bottle - Food.pdf"},
+		{"unknown order leaves the model's reading alone", "2025-03-06", "06/03/2025", "unknown",
+			"03-06-2025 - 10.00 - Blue_Bottle - Food.pdf"},
+		{"an unambiguous printed date is never overruled", "2024-04-22", "04/22/2024", "day-first",
+			"04-22-2024 - 10.00 - Blue_Bottle - Food.pdf"},
+		{"a missing printed date leaves the model's reading alone", "2025-03-06", "", "month-first",
+			"03-06-2025 - 10.00 - Blue_Bottle - Food.pdf"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			reply := fmt.Sprintf(
+				`{"is_hotel":false,"vendor":"Blue Bottle","date":%q,"date_raw":%q,"date_order":%q,"end_date":"","total":10.00,"category":"Food"}`,
+				tc.modelDate, tc.raw, tc.order)
+			r := mustReceipt(t, reply)
+			if got := analyze.ReceiptName(r, ".pdf"); got != tc.want {
+				t.Errorf("ReceiptName() = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+// The fields are new, so a reply without them must still work: an older model,
+// or one that ignores part of the schema, cannot be allowed to fail the file.
+func TestReceiptWithoutTheNewDateFields(t *testing.T) {
+	t.Parallel()
+
+	r := mustReceipt(t, `{"is_hotel":false,"vendor":"Corner Market","date":"2024-05-22","end_date":"","total":8.90,"category":"Groceries"}`)
+	if got, want := analyze.ReceiptName(r, ".pdf"), "05-22-2024 - 8.90 - Corner_Market - Groceries.pdf"; got != want {
+		t.Errorf("ReceiptName() = %q, want %q", got, want)
+	}
+}
+
+// A model that copies the receipt correctly and then mangles its own ISO
+// rendering must not cost the file: the printed date is the better source.
+func TestScrambledISODateFallsBackToThePrintedOne(t *testing.T) {
+	t.Parallel()
+
+	// Observed verbatim from gemma4:e2b on a Berlin hotel folio.
+	r := mustReceipt(t, `{"is_hotel":false,"vendor":"Hotel Adlon","date_raw":"06.08.2023","date_order":"day-first","date":"0682-20-23","end_date":"","total":2280.52,"category":"Lodging"}`)
+	if got, want := analyze.ReceiptName(r, ".pdf"), "08-06-2023 - 2280.52 - Hotel_Adlon - Lodging.pdf"; got != want {
+		t.Errorf("ReceiptName() = %q, want %q", got, want)
+	}
+}
+
+// With neither a usable ISO date nor a readable printed one, the file is still
+// reported as a failure rather than renamed with an invented date.
+func TestNoUsableDateAnywhereStillFails(t *testing.T) {
+	t.Parallel()
+
+	a, _ := newAnalyzer(t,
+		`{"is_hotel":false,"vendor":"Corner Market","date_raw":"","date_order":"unknown","date":"","end_date":"","total":8.90,"category":"Groceries"}`,
+		`{"is_hotel":false,"vendor":"Corner Market","date_raw":"","date_order":"unknown","date":"","end_date":"","total":8.90,"category":"Groceries"}`)
+	if _, err := a.Receipt(context.Background(), textDoc("receipt")); err == nil {
+		t.Error("expected an error when no date can be read at all")
+	}
+}

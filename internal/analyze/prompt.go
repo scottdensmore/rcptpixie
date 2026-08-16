@@ -35,12 +35,14 @@ var ReceiptSchema = json.RawMessage(fmt.Sprintf(`{
   "properties": {
     "is_hotel": {"type": "boolean", "description": "True only for a hotel or lodging stay covering one or more nights."},
     "vendor": {"type": "string", "description": "The business that issued the receipt, spelled as printed."},
+    "date_raw": {"type": "string", "description": "The transaction date copied exactly as it is printed, characters unchanged, for example 06/03/2025 or 15.03.2025 or March 4, 2024. Empty string if the document states no date."},
+    "date_order": {"type": "string", "enum": ["day-first", "month-first", "unknown"], "description": "For a date printed as numbers separated by / . or -, which number comes first. Decide from the document, not from the numbers: a currency, a language, a country or an address tells you. Answer unknown when nothing in the document settles it."},
     "date": {"type": "string", "pattern": %[1]q, "description": "The transaction date as YYYY-MM-DD, where the first number is the four-digit year, the second is the month and the third is the day. For a hotel folio this is the check-in date, the EARLIER of the two dates. Empty string if not stated."},
     "end_date": {"type": "string", "pattern": %[1]q, "description": "The check-out date as YYYY-MM-DD, the LATER of the two dates on a hotel folio. Empty string unless is_hotel is true."},
     "total": {"type": "number", "description": "Grand total actually charged, as a plain number. No currency symbol, no thousands separator, no conversion."},
     "category": {"type": "string", "enum": ["Airfare", "Lodging", "Food", "Transportation", "Fuel", "Groceries", "Software", "Office", "Utilities", "Medical", "Entertainment", "Other"], "description": "The single closest category from the list."}
   },
-  "required": ["is_hotel", "vendor", "date", "end_date", "total", "category"]
+  "required": ["is_hotel", "vendor", "date_raw", "date_order", "date", "end_date", "total", "category"]
 }`, datePattern))
 
 var OrganizeSchema = json.RawMessage(fmt.Sprintf(`{
@@ -52,11 +54,22 @@ var OrganizeSchema = json.RawMessage(fmt.Sprintf(`{
   "required": ["date", "subject"]
 }`, datePattern))
 
+// orderRules exists because 06/03/2025 is the third of June in Dallas and the
+// sixth of March in Dublin, and nothing in the digits decides which. Measured
+// over two photographed corpora, a day/month swap was the dominant date error
+// and it struck sharp images as often as blurred ones, so no amount of
+// rasterizing resolution fixes it. The document itself usually says: a currency,
+// a language, a town. Reporting that evidence is a reading task, which the model
+// is good at; choosing the date from it is arithmetic, which Go does exactly.
+const orderRules = "date_raw is the date copied character for character as printed, so a swapped reading can be corrected later. Copy it even when you are confident.\n" +
+	"date_order describes only how numeric dates are written in THIS document. USD, a US state or a five-digit ZIP means month-first. EUR GBP CHF SEK, a comma used as the decimal separator, a European address, or wording such as SUMME MONTANT TOTALE IVA MWST means day-first. Answer unknown if the document gives you nothing, and never guess it from whether a number happens to exceed 12.\n"
+
 // dateRules is repeated in the prompt because a description alone left the model
 // answering "03/12/2024": naming which number is the month is what fixed it.
 const dateRules = "Write every date as YYYY-MM-DD: the first number is the four-digit year, the second number is the month, the third number is the day. A date printed 15/03/2025 or 03/15/2025 is still returned as 2025-03-15, and 04/02/2025 is returned as 2025-04-02. Move the four-digit year to the front; never split it or pad a two-digit number out to four. Use an empty string for a date you cannot read or the document does not state; never guess one."
 
 const receiptRules = "vendor is the business that issued the receipt, not the customer and not a person's name.\n" +
+	orderRules +
 	"total is the grand total actually charged including tax, not a subtotal and not one line item. 1,234.56 and 1.234,56 both mean 1234.56.\n" +
 	"For a hotel stay set is_hotel true, put the EARLIER (check-in, arrival) date in date and the LATER (check-out, departure) date in end_date. For anything else leave end_date empty.\n" +
 	"Choose category from the allowed list only.\n" +
