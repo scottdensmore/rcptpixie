@@ -39,3 +39,6 @@ go.work
 
 # GoReleaser build output
 /dist/
+
+# Python bytecode from scripts/genphotos
+__pycache__/
