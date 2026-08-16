@@ -59,6 +59,20 @@ day-first and dotted, spelled-out and abbreviated months, a two-digit year,
 hotel folios with two dates, and a bill where printed and due dates compete with
 the service date. Reproduce it with `go test -tags eval ./internal/analyze`.
 
+Those receipts are rendered, not photographed, so they say nothing about a
+creased till roll shot under a desk lamp. To get that number for your own files:
+
+```bash
+mkdir -p testdata/real && cp ~/Receipts/* testdata/real/
+go test -tags eval ./internal/analyze -run TestRealCorpus -eval.corpus=testdata/real -eval.scaffold
+$EDITOR testdata/real/truth.json    # fill in what each receipt really says
+go test -tags eval ./internal/analyze -run TestRealCorpus -eval.corpus=testdata/real -v
+```
+
+The report groups by the path each file actually took, so it also tells you how
+many of your receipts reach the vision path at all. `testdata/real/` is
+gitignored and the files are read only by the Ollama on your machine.
+
 | | date | end date | total | vendor |
 | --- | --- | --- | --- | --- |
 | text layer | 10/12 | 10/12 | 12/12 | 12/12 |

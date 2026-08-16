@@ -121,9 +121,17 @@ func iso(t time.Time) string {
 
 func report(t *testing.T, results []result) {
 	t.Helper()
+	// Real receipts arrive as IMG_20240312_0001.jpg, so the column is sized to
+	// the corpus rather than to a guess.
+	w := len("SAMPLE")
+	for _, r := range results {
+		if n := len(r.sample); n > w {
+			w = n
+		}
+	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "\n%-16s %-5s %-6s %-6s %-6s %-6s %8s  %s\n",
-		"SAMPLE", "PATH", "DATE", "END", "TOTAL", "VENDOR", "TIME", "DETAIL")
+	fmt.Fprintf(&b, "\n%-*s %-5s %-6s %-6s %-6s %-6s %8s  %s\n",
+		w, "SAMPLE", "PATH", "DATE", "END", "TOTAL", "VENDOR", "TIME", "DETAIL")
 
 	tally := map[string]*struct{ n, date, end, total, vendor, failed int }{}
 	for _, r := range results {
@@ -135,8 +143,8 @@ func report(t *testing.T, results []result) {
 
 		if r.err != nil {
 			agg.failed++
-			fmt.Fprintf(&b, "%-16s %-5s %-6s %-6s %-6s %-6s %8s  ERROR: %v\n",
-				r.sample, r.path, "-", "-", "-", "-", r.elapsed.Round(time.Millisecond), r.err)
+			fmt.Fprintf(&b, "%-*s %-5s %-6s %-6s %-6s %-6s %8s  ERROR: %v\n",
+				w, r.sample, r.path, "-", "-", "-", "-", r.elapsed.Round(time.Millisecond), r.err)
 			continue
 		}
 		if r.dateOK {
@@ -165,8 +173,8 @@ func report(t *testing.T, results []result) {
 		if !r.vendorOK {
 			detail = append(detail, "vendor="+r.got.Vendor)
 		}
-		fmt.Fprintf(&b, "%-16s %-5s %-6s %-6s %-6s %-6s %8s  %s\n",
-			r.sample, r.path, mark(r.dateOK), mark(r.endOK), mark(r.totalOK), mark(r.vendorOK),
+		fmt.Fprintf(&b, "%-*s %-5s %-6s %-6s %-6s %-6s %8s  %s\n",
+			w, r.sample, r.path, mark(r.dateOK), mark(r.endOK), mark(r.totalOK), mark(r.vendorOK),
 			r.elapsed.Round(time.Millisecond), strings.Join(detail, " "))
 	}
 
