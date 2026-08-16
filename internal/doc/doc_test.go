@@ -593,3 +593,46 @@ func syntheticText(n int) string {
 	}
 	return s
 }
+
+// A short till receipt has a perfectly good text layer. Routing it to the
+// vision path reads dates worse, needs an external rasterizer and fails
+// outright on a machine without one, so the threshold must sit between a
+// rasterized page (about one non-space character) and a real receipt (44 and
+// up) rather than above both.
+func TestShortReceiptKeepsTheTextPath(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		lines []string
+		want  bool
+	}{
+		{"short till receipt", []string{"SHELL 4471", "12 MAR 24 14:32", "Unleaded 38.11L", "TOTAL 71.24"}, true},
+		{"two digit year", []string{"TRADER JOES 118", "Date 11/02/23", "Groceries", "TOTAL 64.19"}, true},
+		{"dotted euro", []string{"CAFE MOZART", "Wien Austria", "24.12.2023", "Kaffee 4,80", "SUMME 11,00"}, true},
+		{"long prose, no digits", []string{strings.Repeat("lorem ipsum dolor ", 8)}, true},
+		// Watermarks clear a naive low threshold but state no amount or date.
+		{"camscanner watermark", []string{"Scanned by CamScanner"}, false},
+		{"stray glyph", []string{"a"}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			p := buildPDF(t, filepath.Join(t.TempDir(), "receipt.pdf"), []page{{lines: tc.lines}})
+			// A nil rasterizer means the vision path cannot succeed, which is
+			// exactly the machine this misrouting used to break.
+			got, err := doc.Load(context.Background(), p, nil, nil)
+			if tc.want {
+				if err != nil {
+					t.Fatalf("Load: %v (a text-layer receipt must not need a rasterizer)", err)
+				}
+				if got.Kind != doc.KindText {
+					t.Errorf("Kind = %v, want KindText", got.Kind)
+				}
+				return
+			}
+			if err == nil && got.Kind == doc.KindText {
+				t.Errorf("Kind = KindText, want the vision path for %q", tc.lines)
+			}
+		})
+	}
+}
