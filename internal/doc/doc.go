@@ -36,7 +36,19 @@ type Doc struct {
 const (
 	MaxTextChars  = 12000   // ~3-4k tokens, comfortably inside num_ctx 8192
 	MaxImageBytes = 8 << 20 // guard against posting a 40MB scan
-	MinTextChars  = 64      // below this a PDF is treated as a scan
+	// MinTextChars is the count above which a PDF is confidently a text-layer
+	// document. Measured on real pages: a rasterized scan yields about 1
+	// non-space character, while genuine till receipts run to 44-61 — a bimodal
+	// split with nothing in between. The old value of 64 sat above the receipts
+	// rather than between the groups, so a short shop receipt was sent down the
+	// vision path, which reads dates worse and fails outright with no rasterizer
+	// installed.
+	MinTextChars = 64
+	// MinDataTextChars is the lower band, allowed only when the text also holds
+	// a digit. Scanner watermarks ("Scanned by CamScanner" is 19 characters)
+	// clear a low bare threshold but carry no digits, whereas a receipt always
+	// states an amount or a date.
+	MinDataTextChars = 24
 )
 
 // visionPages is how many pages are rendered when a PDF has no text layer.
@@ -175,7 +187,10 @@ func usableText(s string) bool {
 			n++
 		}
 	}
-	return n >= MinTextChars
+	if n >= MinTextChars {
+		return true
+	}
+	return n >= MinDataTextChars && strings.ContainsFunc(s, unicode.IsDigit)
 }
 
 // Truncate keeps the head and the tail of s. Head-biased because the vendor,

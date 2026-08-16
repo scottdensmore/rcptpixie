@@ -52,18 +52,31 @@ for one.
 | `gemma4:e2b-it-qat` | ~4.3 GB | Same size class, quantization-aware trained. Use it on a constrained machine. |
 | `gemma4:e4b`, `gemma4:12b`, and up (`26b`, `31b`) | larger | Better subjects and better date reading, at proportionally more RAM. Select with `-model`. |
 
-**Accuracy, measured on this model.** When a PDF has a real text layer, the
-extraction is accurate — vendor, date, total and category all come back
-correct. When the file is a **scan or a photo**, the vision path reliably reads
-the **vendor and the total**, but the **dates can be wrong** — on a hotel folio
-it has been observed returning the check-out date as the check-in and inventing
-the other. rcptpixie defends against the worst of that (it swaps reversed date
-ranges and drops implausible stays), but the rule stands:
+**Accuracy, measured on this model.** Twelve receipts, each read twice — once
+from its text layer and once rasterized to an image — with `gemma4:e2b`. The
+corpus varies the date format on purpose: ISO, US month-first, European
+day-first and dotted, spelled-out and abbreviated months, a two-digit year,
+hotel folios with two dates, and a bill where printed and due dates compete with
+the service date. Reproduce it with `go test -tags eval ./internal/analyze`.
 
-> Give scanned receipts a look before you file them. If the dates are wrong,
-> escalate the model: `rcptpixie receipts -model gemma4:e4b ~/Receipts`.
+| | date | end date | total | vendor |
+| --- | --- | --- | --- | --- |
+| text layer | 10/12 | 10/12 | 12/12 | 12/12 |
+| scanned image | 10/12 | 9/12 | 11/12 | 12/12 |
 
-Use `-n` first and you will see the dates before anything is renamed.
+Reading from an image is close to reading the text, not far behind it. What
+actually goes wrong is narrower than "scans are unreliable":
+
+- **An ambiguous date stays ambiguous.** `06/03/2025` is June 3rd in the US and
+  3rd June in Europe, and nothing on the receipt settles it.
+- **A digit is occasionally misread** from the image — one receipt dated
+  `05/22/2024` came back as the 20th.
+- **A number that is not the total can win.** On one thermal receipt the card
+  number `****1234` was returned as the amount.
+
+> Use `-n` first: the plan shows every date and total before anything is
+> renamed. For a folder of scans where the dates matter, escalating the model is
+> the cheapest fix: `rcptpixie receipts -model gemma4:e4b ~/Receipts`.
 
 ## Optional dependencies
 

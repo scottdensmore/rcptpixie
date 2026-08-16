@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 	"unicode/utf8"
 
@@ -22,6 +23,9 @@ type Analyzer struct {
 	C     *ollama.Client
 	Model string
 	Log   *slog.Logger
+
+	// raised once the run meets its first scanned page; see numCtxFor.
+	wideCtx atomic.Bool
 }
 
 const (
@@ -104,6 +108,25 @@ func (n *number) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// numCtxFor sizes the context for this document and never shrinks it again.
+//
+// Ollama keys its loaded runner on num_ctx, so changing the value unloads the
+// model and loads it again — measured at roughly 14 seconds per switch for
+// gemma4:e2b on CPU. A directory holding both text-layer PDFs and scans
+// alternates between the two sizes, and paying that on nearly every file made
+// four trivial requests take 63 seconds instead of 8. Keeping the larger size
+// for the rest of the run costs some KV cache and buys at most one reload,
+// while a run that never meets a scan still uses the smaller one.
+func (a *Analyzer) numCtxFor(d *doc.Doc) int {
+	if len(d.Images) > 0 {
+		a.wideCtx.Store(true)
+	}
+	if a.wideCtx.Load() {
+		return visionCtx
+	}
+	return textCtx
+}
+
 func (a *Analyzer) Receipt(ctx context.Context, d *doc.Doc) (Receipt, error) {
 	var w receiptWire
 	if err := a.generateJSON(ctx, kindReceipt, receiptSystem, ReceiptSchema, d, receiptPredict, &w); err != nil {
@@ -121,10 +144,7 @@ func (a *Analyzer) Subject(ctx context.Context, d *doc.Doc) (Subject, error) {
 }
 
 func (a *Analyzer) generateJSON(ctx context.Context, kind, system string, schema json.RawMessage, d *doc.Doc, numPredict int, v any) error {
-	numCtx := textCtx
-	if len(d.Images) > 0 {
-		numCtx = visionCtx
-	}
+	numCtx := a.numCtxFor(d)
 
 	prompt := buildPrompt(kind, d)
 	var raw string

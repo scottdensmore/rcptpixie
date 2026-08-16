@@ -1122,3 +1122,53 @@ func TestSubjectNameAlwaysKeepsASubject(t *testing.T) {
 		}
 	}
 }
+
+// Ollama keys its loaded runner on num_ctx, so a change unloads and reloads the
+// whole model — about 14 seconds for gemma4:e2b on CPU. A directory holding
+// both text-layer PDFs and scans alternates between the two sizes, so the
+// context must never shrink back once a scan has widened it.
+func TestContextSizeNeverShrinksWithinARun(t *testing.T) {
+	t.Parallel()
+
+	a, fake := newAnalyzer(t,
+		receiptReply(false, "A", "2023-01-15", "", "1.00", "Food"),
+		receiptReply(false, "B", "2023-01-16", "", "2.00", "Food"),
+		receiptReply(false, "C", "2023-01-17", "", "3.00", "Food"),
+	)
+	scan := &doc.Doc{
+		Path:    filepath.Join("/inbox", "scanned.pdf"),
+		Kind:    doc.KindImages,
+		Images:  []string{"aGVsbG8="},
+		Pages:   1,
+		ModTime: day(2024, 3, 11),
+	}
+
+	ctx := context.Background()
+	for i, d := range []*doc.Doc{textDoc("a receipt"), scan, textDoc("another receipt")} {
+		if _, err := a.Receipt(ctx, d); err != nil {
+			t.Fatalf("receipt %d: %v", i, err)
+		}
+	}
+
+	var got []float64
+	for i, req := range fake.Requests {
+		opts, ok := req["options"].(map[string]any)
+		if !ok {
+			t.Fatalf("request %d carries no options", i)
+		}
+		n, ok := opts["num_ctx"].(float64)
+		if !ok {
+			t.Fatalf("request %d carries no num_ctx", i)
+		}
+		got = append(got, n)
+	}
+	if len(got) != 3 {
+		t.Fatalf("recorded %d requests, want 3", len(got))
+	}
+	if got[1] <= got[0] {
+		t.Errorf("the scan did not widen the context: %v", got)
+	}
+	if got[2] != got[1] {
+		t.Errorf("the context shrank back to %v after the scan (%v), which reloads the model on every alternation", got[2], got)
+	}
+}
