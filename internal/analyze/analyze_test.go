@@ -1244,3 +1244,36 @@ func TestNoUsableDateAnywhereStillFails(t *testing.T) {
 		t.Error("expected an error when no date can be read at all")
 	}
 }
+
+// A folder of receipts is usually from one country. Saying so must outrank the
+// model's reading of a creased photograph, which is what -date-order is for.
+func TestConfiguredDateOrderOutranksTheDocument(t *testing.T) {
+	t.Parallel()
+
+	// The document claims day-first; the operator says these are US receipts.
+	reply := `{"is_hotel":false,"vendor":"Blue Bottle","date_raw":"03-09-2023","date_order":"day-first","date":"2023-09-03","end_date":"","total":10.00,"category":"Food"}`
+
+	fake := testutil.NewFake(t, []string{testModel}, reply)
+	c, err := ollama.New(fake.URL, 0, nil)
+	if err != nil {
+		t.Fatalf("ollama.New: %v", err)
+	}
+	a := &analyze.Analyzer{C: c, Model: testModel, DateOrder: analyze.OrderMonthFirst}
+	r, err := a.Receipt(context.Background(), textDoc("receipt"))
+	if err != nil {
+		t.Fatalf("Receipt: %v", err)
+	}
+	if got, want := analyze.ReceiptName(r, ".pdf"), "03-09-2023 - 10.00 - Blue_Bottle - Food.pdf"; got != want {
+		t.Errorf("ReceiptName() = %q, want %q", got, want)
+	}
+}
+
+// Left unset, the document still decides.
+func TestUnsetDateOrderLeavesTheDocumentInCharge(t *testing.T) {
+	t.Parallel()
+
+	r := mustReceipt(t, `{"is_hotel":false,"vendor":"Cafe Mozart","date_raw":"03-09-2023","date_order":"day-first","date":"2023-03-09","end_date":"","total":10.00,"category":"Food"}`)
+	if got, want := analyze.ReceiptName(r, ".pdf"), "09-03-2023 - 10.00 - Cafe_Mozart - Food.pdf"; got != want {
+		t.Errorf("ReceiptName() = %q, want %q", got, want)
+	}
+}

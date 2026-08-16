@@ -24,6 +24,12 @@ type Analyzer struct {
 	Model string
 	Log   *slog.Logger
 
+	// DateOrder, when set, settles an ambiguous numeric date instead of the
+	// model's reading of the document. A folder of receipts is usually from one
+	// country, and stating that is more reliable than inferring it from a
+	// creased photograph.
+	DateOrder DateOrder
+
 	// raised once the run meets its first scanned page; see numCtxFor.
 	wideCtx atomic.Bool
 }
@@ -293,6 +299,9 @@ func (a *Analyzer) receiptFrom(w receiptWire, d *doc.Doc) (Receipt, error) {
 	}
 
 	order := parseOrder(w.DateOrder)
+	if a.DateOrder != OrderUnknown {
+		order = a.DateOrder
+	}
 	start, ok := parseDate(w.Date)
 	if !ok || !plausibleDate(start) {
 		// The model sometimes copies the printed date correctly and then

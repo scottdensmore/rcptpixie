@@ -262,6 +262,7 @@ rcptpixie receipts -h    # per-command flags
 | `-host` | — | `http://localhost:11434` | `RCPTPIXIE_HOST`, then `OLLAMA_HOST` | receipts, organize |
 | `-timeout` | — | `5m` | — | receipts, organize |
 | `-ext` | — | receipts: `.pdf,.jpg,.jpeg,.png,.heic`; organize: empty (every file) | — | receipts, organize |
+| `-date-order` | — | `auto` | — | receipts, organize |
 | `-recursive` | `-r` | off | — | receipts, organize |
 | `-dry-run` | `-n` | off | — | all |
 | `-yes` | `-y` | off | — | organize, undo |
@@ -337,6 +338,26 @@ unchanged from earlier versions, byte for byte). The category comes from a
 closed list, so it can never arrive as free text containing a `/`:
 `Airfare`, `Lodging`, `Food`, `Transportation`, `Fuel`, `Groceries`,
 `Software`, `Office`, `Utilities`, `Medical`, `Entertainment`, `Other`.
+
+### Dates that could go either way
+
+`06/03/2025` is the third of June in Dallas and the sixth of March in Dublin,
+and the digits alone cannot say which. rcptpixie asks the model for the date as
+printed and for what the document reveals about its own convention — a currency,
+a language, a town — and then decides in Go. A date is only ever re-read when it
+is genuinely ambiguous: `04/22/2024` is not, because 22 is no month, and
+`05.05.2023` is not, because swapping changes nothing.
+
+Some receipts simply do not say. A folder is usually from one country, and
+saying so is more reliable than inferring it from a creased photograph:
+
+```bash
+rcptpixie receipts -date-order month-first ~/Receipts   # US
+rcptpixie receipts -date-order day-first   ~/Belege     # most of Europe
+```
+
+`-date-order` outranks the document when set. Left at `auto`, an unreadable
+convention leaves the model's own reading alone rather than guessing.
 
 ### `organize`
 

@@ -116,11 +116,13 @@ def money(rng: random.Random, lo: float, hi: float) -> float:
     return round(rng.uniform(lo, hi), 2)
 
 
-def fmt_amount(v: float, euro: bool) -> str:
+def fmt_amount(v: float, euro: bool, symbol: str = "") -> str:
+    """Real receipts print a currency symbol; omitting it left the corpus with no
+    locale evidence at all, which is not a case a real receipt presents."""
     if euro:
         s = f"{v:,.2f}".replace(",", "\x00").replace(".", ",").replace("\x00", ".")
-        return s
-    return f"{v:,.2f}"
+        return f"{s} {symbol}".strip()
+    return f"{symbol}{v:,.2f}"
 
 
 def compose(rng: random.Random, idx: int) -> tuple[list[tuple[str, int]], dict, str]:
@@ -138,6 +140,7 @@ def compose(rng: random.Random, idx: int) -> tuple[list[tuple[str, int]], dict, 
         f, numeric = rng.choice(fmts)
         nights = rng.randint(1, 6)
         out = day + dt.timedelta(days=nights)
+        sym = "EUR" if euro else "$"
         rate = money(rng, 95, 420)
         room = round(rate * nights, 2)
         tax = round(room * rng.uniform(0.08, 0.16), 2)
@@ -147,10 +150,10 @@ def compose(rng: random.Random, idx: int) -> tuple[list[tuple[str, int]], dict, 
             (f"Check-In : {day.strftime(f)}", 0),
             (f"Check-Out: {out.strftime(f)}", 0),
             ("-" * 26, 0),
-            (f"ROOM {nights} x {fmt_amount(rate, euro)}", 0),
-            (f"TAXES{fmt_amount(tax, euro):>21}", 0),
+            (f"ROOM {nights} x {fmt_amount(rate, euro, sym)}", 0),
+            (f"TAXES{fmt_amount(tax, euro, sym):>21}", 0),
             ("-" * 26, 0),
-            (f"TOTAL{fmt_amount(total, euro):>21}", 1),
+            (f"TOTAL{fmt_amount(total, euro, sym):>21}", 1),
         ]
         truth = {
             "vendor": name.split()[0] if len(name.split()) < 3 else " ".join(name.split()[:2]),
@@ -165,12 +168,13 @@ def compose(rng: random.Random, idx: int) -> tuple[list[tuple[str, int]], dict, 
     fmts = EU_DATE_FORMATS if euro else US_DATE_FORMATS
     f, numeric = rng.choice(fmts)
 
+    sym = rng.choice(["EUR", "\u20ac"]) if euro else "$"
     picks = rng.sample(ITEMS, rng.randint(2, 5))
     rows, subtotal = [], 0.0
     for label, lo, hi in picks:
         v = money(rng, lo, hi)
         subtotal += v
-        rows.append((f"{label:<16}{fmt_amount(v, euro):>10}", 0))
+        rows.append((f"{label:<16}{fmt_amount(v, euro, sym):>11}", 0))
     subtotal = round(subtotal, 2)
     tax = round(subtotal * rng.uniform(0.0, 0.11), 2)
     total = round(subtotal + tax, 2)
@@ -182,9 +186,9 @@ def compose(rng: random.Random, idx: int) -> tuple[list[tuple[str, int]], dict, 
     lines += rows
     lines.append(("-" * 26, 0))
     if tax > 0:
-        lines.append((f"SUBTOTAL{fmt_amount(subtotal, euro):>18}", 0))
-        lines.append((f"TAX{fmt_amount(tax, euro):>23}", 0))
-    lines.append((f"TOTAL{fmt_amount(total, euro):>21}", 1))
+        lines.append((f"SUBTOTAL{fmt_amount(subtotal, euro, sym):>18}", 0))
+        lines.append((f"TAX{fmt_amount(tax, euro, sym):>23}", 0))
+    lines.append((f"TOTAL{fmt_amount(total, euro, sym):>21}", 1))
     if rng.random() < 0.6:
         lines += [("", 0), (f"VISA ****{rng.randint(1000, 9999)}  APPROVED", 0)]
 

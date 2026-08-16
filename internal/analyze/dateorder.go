@@ -15,6 +15,10 @@ const (
 	OrderMonthFirst
 )
 
+// ParseDateOrder reads the -date-order flag. Anything unrecognised, including
+// "auto", leaves the decision to the document.
+func ParseDateOrder(s string) DateOrder { return parseOrder(s) }
+
 func parseOrder(s string) DateOrder {
 	switch strings.ToLower(strings.TrimSpace(s)) {
 	case "day-first", "day_first", "dayfirst", "dmy":
