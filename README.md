@@ -516,3 +516,10 @@ Errors are actionable and name the fix:
 ## License
 
 MIT License - see LICENSE file for details
+
+
+### Build/test CI scope
+
+The read-only workflow uses preinstalled Go on Linux, macOS and Windows, verifies locked modules and all nine committed synthetic fixtures, retains formatting/vet/tidy checks, runs the entire default race-enabled suite with measured coverage, and builds/smokes the CLI using help/version only. It never enables the live-model `eval` build tag, regenerates fixtures, executes release tooling, downloads models, starts Ollama or renames user documents. Existing guarded platform/tool skips are reported rather than replaced with new test filters.
+
+The former CI's real-rasterizer requirement is retained: Linux must actually pass `TestLoadScannedWithRealRasterizer` using an already installed `pdftoppm`. If that prerequisite is absent, CI reports a blocker; it does not install Poppler or silently treat skipped real-rasterizer coverage as verified. The nested fixture-generator module and separate dependency PR remain untouched.

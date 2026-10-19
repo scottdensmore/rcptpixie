@@ -1,0 +1,91 @@
+name: Offline build and test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: ${{ matrix.label }} default suite
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Linux
+            os: ubuntu-24.04
+            python: python3
+          - label: macOS
+            os: macos-26-intel
+            python: python3
+          - label: Windows
+            os: windows-2025
+            python: python
+    defaults:
+      run:
+        shell: bash
+    env:
+      GOTOOLCHAIN: local
+      GOFLAGS: -mod=readonly
+      GOENV: 'off'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Select an existing toolchain without installation
+        run: ${{ matrix.python }} -I scripts/ci/select_go.py
+      - name: Verify locked modules and committed synthetic fixtures
+        run: |
+          set -euo pipefail
+          go mod download
+          go mod verify
+          for fixture in receipt-text.pdf receipt-multipage.pdf receipt-encrypted.pdf receipt-corrupt.pdf receipt-empty.pdf receipt-scanned.pdf receipt-panics.pdf receipt.png receipt.jpg; do
+            test -s "testdata/$fixture"
+          done
+      - name: Retain formatting, vet and tidy checks
+        run: |
+          set -euo pipefail
+          unformatted="$(gofmt -l .)"
+          if [[ -n "$unformatted" ]]; then
+            printf '%s\n' "$unformatted"
+            exit 1
+          fi
+          go vet ./...
+          go mod tidy -diff
+      - name: Run every default test with race detection and coverage
+        run: |
+          set -euo pipefail
+          go test -race -json -coverprofile="$RUNNER_TEMP/coverage.out" ./... | tee "$RUNNER_TEMP/tests.jsonl"
+          go tool cover -func="$RUNNER_TEMP/coverage.out" | tail -1
+      - name: Build the native CLI and run help/version only
+        run: |
+          set -euo pipefail
+          binary="$RUNNER_TEMP/rcptpixie"
+          if [[ '${{ matrix.label }}' == Windows ]]; then binary="$binary.exe"; fi
+          go build -o "$binary" ./cmd/rcptpixie
+          "$binary" -version
+          "$binary" help
+      - name: Report skips and retain real rasterizer coverage
+        run: ${{ matrix.python }} -I scripts/ci/check_results.py "$RUNNER_TEMP/tests.jsonl" '${{ matrix.label }}'
+      - name: Verify tracked sources, fixtures and module locks were preserved
+        run: git diff --quiet --exit-code
+      - name: Retain failure logs only
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: failure-${{ matrix.label }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/tests.jsonl
+            ${{ runner.temp }}/coverage.out
+          retention-days: 3
