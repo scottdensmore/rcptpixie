@@ -56,6 +56,7 @@ jobs:
       - name: Retain formatting, vet and tidy checks
         run: |
           set -euo pipefail
+          git ls-files --eol '*.go' go.mod go.sum
           unformatted="$(gofmt -l .)"
           if [[ -n "$unformatted" ]]; then
             printf '%s\n' "$unformatted"

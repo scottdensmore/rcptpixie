@@ -523,3 +523,6 @@ MIT License - see LICENSE file for details
 The read-only workflow uses preinstalled Go on Linux, macOS and Windows, verifies locked modules and all nine committed synthetic fixtures, retains formatting/vet/tidy checks, runs the entire default race-enabled suite with measured coverage, and builds/smokes the CLI using help/version only. It never enables the live-model `eval` build tag, regenerates fixtures, executes release tooling, downloads models, starts Ollama or renames user documents. Existing guarded platform/tool skips are reported rather than replaced with new test filters.
 
 The former CI's real-rasterizer requirement is retained: Linux must actually pass `TestLoadScannedWithRealRasterizer` using an already installed `pdftoppm`. If that prerequisite is absent, CI reports a blocker; it does not install Poppler or silently treat skipped real-rasterizer coverage as verified. The nested fixture-generator module and separate dependency PR remain untouched.
+
+
+Go source and module files use repository-controlled LF checkout attributes so Windows core.autocrlf settings do not make clean source appear unformatted. No user or system Git setting is changed.

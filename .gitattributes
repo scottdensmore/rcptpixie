@@ -1,0 +1,4 @@
+# Keep Go formatting and module checks stable on Windows checkouts.
+*.go text eol=lf
+go.mod text eol=lf
+go.sum text eol=lf
