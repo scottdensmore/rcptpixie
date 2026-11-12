@@ -42,3 +42,24 @@ go.work
 
 # Python bytecode from scripts/genphotos
 __pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Go workspace sum
+go.work.sum
+
+# OS metadata
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+Thumbs.db
+ehthumbs.db
+[Dd]esktop.ini
+
+# Editor backups and local environment
+*~
+.env
+.env.*
+!.env.example
